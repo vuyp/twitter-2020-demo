@@ -223,17 +223,21 @@ export function AppShell({
       {!hideRightSidebar && <RightSidebar />}
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        {navItems.slice(0, 4).map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            aria-label={item.label}
-            aria-current={isActive(item) ? 'page' : undefined}
-            className={isActive(item) ? 'active' : ''}
-          >
-            <Icon name={item.icon} size={26} />
-          </Link>
-        ))}
+        {navItems
+          .filter((item) =>
+            ['Home', 'Explore', 'Notifications', 'Messages', 'Profile'].includes(item.label),
+          )
+          .map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              aria-label={item.label}
+              aria-current={isActive(item) ? 'page' : undefined}
+              className={isActive(item) ? 'active' : ''}
+            >
+              <Icon name={item.icon} size={26} />
+            </Link>
+          ))}
       </nav>
       <button className="mobile-compose" onClick={openCompose} aria-label="Compose a Tweet">
         <Icon name="feather" size={24} />
@@ -517,21 +521,29 @@ export function EmptyState({
 }) {
   return (
     <div className="empty-state">
-      {icon && <Icon name={icon} size={42} />}
+      {icon && (
+        <span className="state-icon" aria-hidden="true">
+          <Icon name={icon} size={32} />
+        </span>
+      )}
       <h2>{title}</h2>
       <p>{body}</p>
-      {action}
+      {action && <div className="state-action">{action}</div>}
     </div>
   );
 }
 
 export function ErrorState({ message, retry }: { message?: string; retry?: () => void }) {
+  const generic = !message || message.toLowerCase() === 'something went wrong';
   return (
-    <div className="error-state">
-      <Icon name="warning" size={34} />
-      <p>{message || 'Something went wrong. Try again.'}</p>
+    <div className="error-state" role="alert">
+      <span className="state-icon state-icon-error" aria-hidden="true">
+        <Icon name="warning" size={30} />
+      </span>
+      <h2>Something went wrong</h2>
+      <p>{generic ? "We couldn't load this right now. Please try again." : message}</p>
       {retry && (
-        <button className="button" onClick={retry}>
+        <button className="button button-primary" onClick={retry}>
           Try again
         </button>
       )}

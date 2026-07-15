@@ -44,15 +44,24 @@ export function LoggedOutLanding() {
         <ul>
           <li>
             <Icon name="search" size={28} />
-            <span>Follow your interests.</span>
+            <span>
+              <strong>Follow your interests.</strong>
+              <small>Build a timeline around the people and topics you care about.</small>
+            </span>
           </li>
           <li>
             <Icon name="people" size={28} />
-            <span>Hear what people are talking about.</span>
+            <span>
+              <strong>Hear what people are talking about.</strong>
+              <small>See conversations and breaking stories unfold in real time.</small>
+            </span>
           </li>
           <li>
             <Icon name="reply" size={28} />
-            <span>Join the conversation.</span>
+            <span>
+              <strong>Join the conversation.</strong>
+              <small>Share what’s happening and connect with your people.</small>
+            </span>
           </li>
         </ul>
       </section>
@@ -64,7 +73,11 @@ export function LoggedOutLanding() {
               Log in
             </button>
           </div>
+          <p className="landing-eyebrow">Happening now</p>
           <h1>See what’s happening in the world right now</h1>
+          <p className="landing-supporting-copy">
+            Follow the stories, voices, and moments that matter to you.
+          </p>
           <h2>Join Twitter today.</h2>
           <button className="button button-primary landing-cta" onClick={() => setMode('signup')}>
             Sign up

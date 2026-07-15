@@ -82,6 +82,7 @@ export function ProfileScreen({ handle, tab = 'tweets' }: { handle: string; tab?
   );
   const [followOverride, setFollowOverride] = useState<boolean | null>(null);
   const [requestOverride, setRequestOverride] = useState<boolean | null>(null);
+  const [followPending, setFollowPending] = useState(false);
   const [blockOverride, setBlockOverride] = useState<boolean | null>(null);
   const [muteOverride, setMuteOverride] = useState<boolean | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -122,6 +123,7 @@ export function ProfileScreen({ handle, tab = 'tweets' }: { handle: string; tab?
 
   const toggleFollow = async () => {
     if (!user) return;
+    if (followPending) return;
     if (!viewer) {
       router.push('/login');
       return;
@@ -131,6 +133,7 @@ export function ProfileScreen({ handle, tab = 'tweets' }: { handle: string; tab?
     const active = wasFollowing || wasRequested;
     setFollowOverride(active ? false : !user.protected);
     setRequestOverride(active ? false : Boolean(user.protected));
+    setFollowPending(true);
     try {
       const result = await apiFetch<{ state?: 'following' | 'requested' | 'not-following' }>(
         `/api/v1/users/${encodeURIComponent(user.handle)}/follow`,
@@ -145,6 +148,8 @@ export function ProfileScreen({ handle, tab = 'tweets' }: { handle: string; tab?
       setFollowOverride(wasFollowing);
       setRequestOverride(wasRequested);
       showToast(reason instanceof Error ? reason.message : 'That follow request didn’t work.');
+    } finally {
+      setFollowPending(false);
     }
   };
   const startMessage = async () => {
@@ -306,14 +311,20 @@ export function ProfileScreen({ handle, tab = 'tweets' }: { handle: string; tab?
               <button
                 className={`button follow-profile ${following ? 'following' : ''}`}
                 onClick={() => void toggleFollow()}
+                disabled={followPending}
+                aria-busy={followPending}
               >
-                {followRequested
-                  ? 'Pending'
-                  : user.protected && !following
-                    ? 'Request to follow'
-                    : following
-                      ? 'Following'
-                      : 'Follow'}
+                {followPending ? (
+                  <Spinner label="Updating follow" />
+                ) : followRequested ? (
+                  'Pending'
+                ) : user.protected && !following ? (
+                  'Request to follow'
+                ) : following ? (
+                  'Following'
+                ) : (
+                  'Follow'
+                )}
               </button>
             )}
             {menuOpen && (

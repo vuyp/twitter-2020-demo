@@ -4,7 +4,7 @@
   left: 50%;
   bottom: 28px;
   display: flex;
-  width: min(92vw, 420px);
+  width: min(92vw, 460px);
   transform: translateX(-50%);
   flex-direction: column;
   align-items: stretch;
@@ -14,14 +14,25 @@
 
 .toast {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  border-radius: 4px;
-  background: var(--accent);
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid color-mix(in srgb, white 20%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 92%, #0f1419);
   color: #fff;
-  padding: 12px 16px;
-  box-shadow: var(--shadow);
+  padding: 13px 16px;
+  box-shadow: 0 8px 28px rgba(15, 20, 25, 0.22);
   pointer-events: auto;
+  animation: toast-enter 180ms cubic-bezier(0.2, 0, 0, 1);
+  font-weight: 500;
+}
+
+@keyframes toast-enter {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
 }
 
 .toast button {
@@ -30,6 +41,7 @@
   color: #fff;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 @media (max-width: 687px) {

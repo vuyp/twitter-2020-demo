@@ -44,6 +44,15 @@
   background: var(--accent);
   color: white;
 }
+.follow-profile .spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+.follow-profile.following .spinner {
+  border-color: rgba(255, 255, 255, 0.38);
+  border-top-color: white;
+}
 .profile-menu {
   position: absolute;
   z-index: 50;

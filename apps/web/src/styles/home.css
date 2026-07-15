@@ -11,13 +11,14 @@
   right: -6px;
   width: 385px;
   overflow: hidden;
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
   background: var(--surface-raised);
   box-shadow: var(--shadow);
 }
 .home-switcher-hero {
   display: flex;
-  min-height: 105px;
+  min-height: 116px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -27,6 +28,9 @@
 }
 .home-switcher-hero svg {
   color: var(--accent);
+}
+.home-switcher-hero strong {
+  font-size: 16px;
 }
 .home-switcher > button,
 .home-switcher > a {
@@ -69,6 +73,8 @@
   background: var(--surface);
   color: var(--accent);
   cursor: pointer;
+  font-weight: 600;
+  transition: background 140ms ease;
 }
 .new-tweets-prompt:hover {
   background: var(--surface-hover);

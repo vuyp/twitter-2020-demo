@@ -135,8 +135,31 @@ chmod 600 "$env_temp"
 mv "$env_temp" "$env_file"
 
 app_image="twitter-2020-app:latest"
-if [ "${1:-}" = "--build" ] || ! docker image inspect "$app_image" >/dev/null 2>&1; then
-  docker build --target build --tag "$app_image" .
+source_fingerprint="$(
+  {
+    git rev-parse HEAD
+    git diff --no-ext-diff --binary HEAD --
+    while IFS= read -r -d '' path; do
+      printf '%s\0' "$path"
+      sha256sum -- "$path"
+    done < <(git ls-files --others --exclude-standard -z)
+  } | sha256sum | cut -d ' ' -f 1
+)"
+image_fingerprint="$(
+  docker image inspect \
+    --format '{{ index .Config.Labels "com.twitter2020.source-fingerprint" }}' \
+    "$app_image" 2>/dev/null || true
+)"
+
+if [ "${1:-}" = "--build" ] || [ "$image_fingerprint" != "$source_fingerprint" ]; then
+  echo "Building the application image for the current source checkout."
+  docker build \
+    --target build \
+    --label "com.twitter2020.source-fingerprint=${source_fingerprint}" \
+    --tag "$app_image" \
+    .
+else
+  echo "The application image already matches the current source checkout."
 fi
 
 docker compose \

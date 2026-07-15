@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { apiFetch } from '@/hooks/use-api';
 import { useSession, useTheme, useToast } from '@/components/providers/app-providers';
-import { Avatar, Modal, VerifiedBadge } from '@/components/ui/primitives';
+import { Avatar, Modal, Spinner, VerifiedBadge } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/icon';
 import { normalizeTweet, type Tweet } from '@/components/types';
 import { TweetComposer } from './tweet-composer';
@@ -38,6 +38,7 @@ export function TweetCard({
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [retweetMenuOpen, setRetweetMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'like' | 'retweet' | 'bookmark' | null>(null);
   const { viewer } = useSession();
   const { showToast } = useToast();
   const router = useRouter();
@@ -55,6 +56,7 @@ export function TweetCard({
 
   const toggle = async (kind: 'like' | 'retweet' | 'bookmark') => {
     if (!requireViewer()) return;
+    if (pendingAction) return;
     const activeKey = kind === 'like' ? 'liked' : kind === 'retweet' ? 'retweeted' : 'bookmarked';
     const countKey = kind === 'like' ? 'likeCount' : kind === 'retweet' ? 'retweetCount' : null;
     const wasActive = tweet[activeKey];
@@ -63,6 +65,7 @@ export function TweetCard({
       [activeKey]: !wasActive,
       ...(countKey ? { [countKey]: Math.max(0, current[countKey] + (wasActive ? -1 : 1)) } : {}),
     }));
+    setPendingAction(kind);
     try {
       await apiFetch(`/api/v1/tweets/${tweet.id}/${kind}`, {
         method: wasActive ? 'DELETE' : 'POST',
@@ -79,6 +82,8 @@ export function TweetCard({
         ...(countKey ? { [countKey]: Math.max(0, current[countKey] + (wasActive ? 1 : -1)) } : {}),
       }));
       showToast(reason instanceof Error ? reason.message : 'That action didn’t work. Try again.');
+    } finally {
+      setPendingAction(null);
     }
   };
 
@@ -329,6 +334,7 @@ export function TweetCard({
               icon="retweet"
               className="retweet"
               active={tweet.retweeted}
+              loading={pendingAction === 'retweet'}
               onClick={() => {
                 if (requireViewer()) setRetweetMenuOpen((value) => !value);
               }}
@@ -363,6 +369,7 @@ export function TweetCard({
             className="like"
             active={tweet.liked}
             fill={tweet.liked}
+            loading={pendingAction === 'like'}
             onClick={() => void toggle('like')}
           />
           <ActionButton
@@ -422,6 +429,7 @@ function ActionButton({
   className,
   active,
   fill,
+  loading,
   onClick,
 }: {
   label: string;
@@ -430,11 +438,14 @@ function ActionButton({
   className: string;
   active?: boolean;
   fill?: boolean;
+  loading?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       className={`tweet-action ${className} ${active ? 'active' : ''}`}
+      disabled={loading}
+      aria-busy={loading}
       onClick={(event) => {
         event.stopPropagation();
         onClick();
@@ -443,7 +454,11 @@ function ActionButton({
       aria-pressed={active}
     >
       <span>
-        <Icon name={icon} size={19} fill={fill ? 'currentColor' : 'none'} />
+        {loading ? (
+          <Spinner label={`${label} in progress`} />
+        ) : (
+          <Icon name={icon} size={19} fill={fill ? 'currentColor' : 'none'} />
+        )}
       </span>
       {typeof count === 'number' && count > 0 && (
         <small>{count > 9999 ? `${(count / 1000).toFixed(1)}K` : count}</small>

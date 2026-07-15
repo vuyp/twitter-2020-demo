@@ -7,7 +7,8 @@ import { Icon } from '@/components/ui/icon';
 import { useApi } from '@/hooks/use-api';
 import { apiFetch } from '@/hooks/use-api';
 import { normalizeUser, type User } from '@/components/types';
-import { Avatar, VerifiedBadge } from '@/components/ui/primitives';
+import { Avatar, Skeleton, Spinner, VerifiedBadge } from '@/components/ui/primitives';
+import { useSession, useToast } from '@/components/providers/app-providers';
 
 type Trend = {
   name?: string;
@@ -22,8 +23,18 @@ export function RightSidebar() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [query, setQuery] = useState(searchParams.get('q') || '');
-  const { data: trendPayload, loading } = useApi<unknown[]>('/api/v1/trends', []);
-  const { data: suggestionPayload } = useApi<unknown>('/api/v1/suggestions');
+  const {
+    data: trendPayload,
+    loading: trendsLoading,
+    error: trendsError,
+    reload: reloadTrends,
+  } = useApi<unknown[]>('/api/v1/trends', []);
+  const {
+    data: suggestionPayload,
+    loading: suggestionsLoading,
+    error: suggestionsError,
+    reload: reloadSuggestions,
+  } = useApi<unknown>('/api/v1/suggestions');
   const trends = Array.isArray(trendPayload) ? (trendPayload as Trend[]) : [];
   const suggestionSource =
     suggestionPayload && typeof suggestionPayload === 'object' && !Array.isArray(suggestionPayload)
@@ -71,7 +82,7 @@ export function RightSidebar() {
             <Icon name="settings" size={21} />
           </Link>
         </div>
-        {loading &&
+        {trendsLoading &&
           Array.from({ length: 3 }).map((_, i) => (
             <div className="trend-row trend-row-loading" key={i}>
               <span />
@@ -79,24 +90,28 @@ export function RightSidebar() {
               <span />
             </div>
           ))}
-        {!loading && trends.length === 0 && (
+        {!trendsLoading && trendsError && (
+          <SidebarError message="Trends aren’t available right now." retry={reloadTrends} />
+        )}
+        {!trendsLoading && !trendsError && trends.length === 0 && (
           <div className="sidebar-card-empty">Trends appear here as people start Tweeting.</div>
         )}
-        {trends.slice(0, 6).map((trend, index) => {
-          const name = trend.name || trend.topic || '';
-          const count = trend.tweetCount || trend.count;
-          return (
-            <Link
-              key={`${name}-${index}`}
-              href={`/search?q=${encodeURIComponent(name)}`}
-              className="trend-row"
-            >
-              <span>{trend.category || 'Trending'}</span>
-              <strong>{name}</strong>
-              {count ? <span>{count.toLocaleString()} Tweets</span> : <span>Trending now</span>}
-            </Link>
-          );
-        })}
+        {!trendsError &&
+          trends.slice(0, 6).map((trend, index) => {
+            const name = trend.name || trend.topic || '';
+            const count = trend.tweetCount || trend.count;
+            return (
+              <Link
+                key={`${name}-${index}`}
+                href={`/search?q=${encodeURIComponent(name)}`}
+                className="trend-row"
+              >
+                <span>{trend.category || 'Trending'}</span>
+                <strong>{name}</strong>
+                {count ? <span>{count.toLocaleString()} Tweets</span> : <span>Trending now</span>}
+              </Link>
+            );
+          })}
         <Link className="sidebar-show-more" href="/explore">
           Show more
         </Link>
@@ -105,14 +120,32 @@ export function RightSidebar() {
         <div className="sidebar-card-title">
           <h2 id="follow-title">Who to follow</h2>
         </div>
-        {suggestions.length === 0 && (
+        {suggestionsLoading &&
+          Array.from({ length: 3 }).map((_, index) => (
+            <div className="suggestion-card suggestion-card-loading" key={index}>
+              <Skeleton width={40} height={40} round />
+              <span className="suggestion-loading-copy">
+                <Skeleton width="72%" height={13} />
+                <Skeleton width="52%" height={11} />
+              </span>
+              <Skeleton width={68} height={30} round />
+            </div>
+          ))}
+        {!suggestionsLoading && suggestionsError && (
+          <SidebarError
+            message="Suggestions aren’t available right now."
+            retry={reloadSuggestions}
+          />
+        )}
+        {!suggestionsLoading && !suggestionsError && suggestions.length === 0 && (
           <div className="sidebar-card-empty">
             Suggestions will appear as Twitter learns who you’re interested in.
           </div>
         )}
-        {suggestions.slice(0, 3).map((user) => (
-          <SuggestionCard user={user} key={user.id || user.handle} />
-        ))}
+        {!suggestionsError &&
+          suggestions
+            .slice(0, 3)
+            .map((user) => <SuggestionCard user={user} key={user.id || user.handle} />)}
         <Link className="sidebar-show-more" href="/connect_people">
           Show more
         </Link>
@@ -140,8 +173,22 @@ export function RightSidebar() {
   );
 }
 
+function SidebarError({ message, retry }: { message: string; retry: () => void }) {
+  return (
+    <div className="sidebar-card-error">
+      <span>{message}</span>
+      <button onClick={retry}>Try again</button>
+    </div>
+  );
+}
+
 function SuggestionCard({ user }: { user: User }) {
   const [following, setFollowing] = useState(Boolean(user.following));
+  const [followRequested, setFollowRequested] = useState(Boolean(user.followRequested));
+  const [pending, setPending] = useState(false);
+  const { viewer } = useSession();
+  const { showToast } = useToast();
+  const router = useRouter();
   return (
     <div className="suggestion-card">
       <Link href={`/${user.handle}`}>
@@ -156,20 +203,48 @@ function SuggestionCard({ user }: { user: User }) {
       </Link>
       <button
         className={`button ${following ? 'following' : ''}`}
+        disabled={pending}
+        aria-busy={pending}
         onClick={async () => {
-          const before = following;
-          setFollowing(!before);
+          if (!viewer) {
+            router.push('/login');
+            return;
+          }
+          const wasFollowing = following;
+          const wasRequested = followRequested;
+          const active = wasFollowing || wasRequested;
+          setFollowing(active ? false : !user.protected);
+          setFollowRequested(active ? false : Boolean(user.protected));
+          setPending(true);
           try {
-            await apiFetch(`/api/v1/users/${user.handle}/follow`, {
-              method: before ? 'DELETE' : 'POST',
-              ...(before ? {} : { body: JSON.stringify({}) }),
+            const result = await apiFetch<{
+              state?: 'following' | 'requested' | 'not-following';
+            }>(`/api/v1/users/${encodeURIComponent(user.handle)}/follow`, {
+              method: active ? 'DELETE' : 'POST',
+              ...(active ? {} : { body: JSON.stringify({}) }),
             });
-          } catch {
-            setFollowing(before);
+            setFollowing(result.state === 'following');
+            setFollowRequested(result.state === 'requested');
+          } catch (reason) {
+            setFollowing(wasFollowing);
+            setFollowRequested(wasRequested);
+            showToast(
+              reason instanceof Error ? reason.message : 'That follow request didn’t work.',
+            );
+          } finally {
+            setPending(false);
           }
         }}
       >
-        {following ? 'Following' : 'Follow'}
+        {pending ? (
+          <Spinner label="Updating follow" />
+        ) : followRequested ? (
+          'Pending'
+        ) : following ? (
+          'Following'
+        ) : (
+          'Follow'
+        )}
       </button>
     </div>
   );

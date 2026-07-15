@@ -597,11 +597,23 @@ async function validateProfileMedia(
 
 type SqlClient = Parameters<Parameters<typeof transaction>[0]>[0];
 
+type NotificationType =
+  | 'follow'
+  | 'follow_request'
+  | 'like'
+  | 'retweet'
+  | 'quote'
+  | 'reply'
+  | 'mention'
+  | 'poll_vote'
+  | 'dm'
+  | 'system';
+
 export async function insertNotification(
   client: SqlClient,
   recipientId: string,
   actorId: string | null,
-  type: string,
+  type: NotificationType,
   tweetId: string | null,
   dedupeKey: string,
   message: string | null = null,
@@ -609,14 +621,17 @@ export async function insertNotification(
   if (recipientId === actorId) return;
   await client.query(
     `INSERT INTO notifications (recipient_id, actor_id, type, tweet_id, message, dedupe_key)
-     SELECT $1, $2, $3, $4, $5, $6
+     SELECT $1, $2, $3::notification_type, $4, $5, $6
      WHERE COALESCE((
-       SELECT CASE
-         WHEN $3 IN ('like') THEN notification_likes
-         WHEN $3 IN ('retweet', 'quote') THEN notification_retweets
-         WHEN $3 IN ('follow', 'follow_request') THEN notification_follows
-         WHEN $3 IN ('mention', 'reply') THEN notification_mentions
-         WHEN $3 = 'dm' THEN notification_direct_messages
+       SELECT CASE $3::notification_type
+         WHEN 'like' THEN notification_likes
+         WHEN 'retweet' THEN notification_retweets
+         WHEN 'quote' THEN notification_retweets
+         WHEN 'follow' THEN notification_follows
+         WHEN 'follow_request' THEN notification_follows
+         WHEN 'mention' THEN notification_mentions
+         WHEN 'reply' THEN notification_mentions
+         WHEN 'dm' THEN notification_direct_messages
          ELSE true
        END
        FROM user_settings WHERE user_id = $1

@@ -42,7 +42,8 @@ Codespaces-specific secrets are generated once in the ignored `.devcontainer/.en
 file. Email verification is disabled only in the Codespaces demo, so new accounts continue
 straight to onboarding. If GitHub policy prevents automatic public visibility, open the **Ports**
 panel, right-click port 80, choose **Port Visibility**, then **Public**. To restart manually, run
-`bash .devcontainer/start.sh`; add `--build` after changing application code or dependencies.
+`bash .devcontainer/start.sh`. Startup automatically rebuilds the shared application image when
+the source checkout changes; add `--build` only when you need to force a clean source refresh.
 
 To protect the shared demo machine, Codespaces limits images to 10 MB, videos to 50 MB, and each
 account to 30 upload requests per hour. Normal self-hosted defaults retain the historical 15 MB

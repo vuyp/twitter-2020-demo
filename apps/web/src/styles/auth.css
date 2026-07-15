@@ -15,18 +15,20 @@
 .landing-benefits {
   position: relative;
   display: grid;
-  min-height: 650px;
+  min-height: max(650px, calc(100vh - 52px));
   overflow: hidden;
   place-items: center;
-  background: #1da1f2;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.12), transparent 28%),
+    linear-gradient(145deg, #1da1f2 0%, #168cd8 100%);
   color: #fff;
 }
 .landing-bird-bg {
   position: absolute;
   top: 50%;
   left: 50%;
-  color: #1b95e0;
-  transform: translate(-40%, -50%);
+  color: rgba(11, 112, 174, 0.3);
+  transform: translate(-42%, -50%) rotate(-4deg);
 }
 .landing-benefits ul {
   position: relative;
@@ -34,25 +36,50 @@
   display: flex;
   margin: 0;
   flex-direction: column;
-  gap: 40px;
-  padding: 0 38px;
+  width: min(520px, 90%);
+  gap: 30px;
+  padding: 0;
   list-style: none;
 }
 .landing-benefits li {
   display: flex;
-  align-items: center;
-  gap: 18px;
+  align-items: flex-start;
+  gap: 16px;
+}
+.landing-benefits li > svg {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 10px;
+}
+.landing-benefits li > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 1px;
+}
+.landing-benefits li strong {
   font-size: 19px;
-  font-weight: 700;
+  font-weight: 800;
+}
+.landing-benefits li small {
+  max-width: 380px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  line-height: 19px;
 }
 .landing-join {
   display: grid;
-  min-height: 650px;
+  min-height: max(650px, calc(100vh - 52px));
   place-items: center;
-  padding: 40px;
+  background: radial-gradient(circle at 88% 8%, rgba(29, 161, 242, 0.07), transparent 30%), #fff;
+  padding: 48px;
 }
 .landing-card {
-  width: min(380px, 100%);
+  width: min(430px, 100%);
 }
 .landing-card-head {
   display: flex;
@@ -62,19 +89,48 @@
 }
 .landing-card-head .button {
   min-width: 82px;
+  min-height: 40px;
+}
+.landing-eyebrow {
+  margin: 42px 0 10px;
+  color: #1da1f2;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .landing-card h1 {
-  margin: 32px 0 56px;
-  font-size: 31px;
-  line-height: 1.25;
+  margin: 0;
+  font-size: clamp(36px, 3vw, 44px);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+}
+.landing-supporting-copy {
+  max-width: 390px;
+  margin: 18px 0 36px;
+  color: #536471;
+  font-size: 16px;
+  line-height: 22px;
 }
 .landing-card h2 {
-  margin: 0 0 15px;
-  font-size: 15px;
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 800;
 }
 .landing-cta {
   width: 100%;
-  margin-bottom: 15px;
+  min-height: 48px;
+  margin-bottom: 12px;
+}
+.landing-cta.button-primary,
+.cookie-notice .button-primary {
+  border-color: #087bb5;
+  background: #087bb5;
+}
+.landing-cta.button-primary:hover,
+.cookie-notice .button-primary:hover {
+  background: #076da1;
 }
 .landing-footer {
   grid-column: 1 / -1;
@@ -85,6 +141,7 @@
   justify-content: center;
   gap: 5px 15px;
   color: #657786;
+  border-top: 1px solid #ebeef0;
   padding: 10px 20px;
   font-size: 13px;
 }
@@ -101,10 +158,11 @@
   align-items: center;
   justify-content: center;
   gap: 24px;
-  background: #15202b;
+  background: rgba(21, 32, 43, 0.96);
+  backdrop-filter: blur(10px);
   color: white;
   padding: 12px 20px;
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18);
 }
 .cookie-notice p {
   margin: 0;
@@ -138,7 +196,8 @@
 }
 .auth-form-wrap h1 {
   margin: 15px 0 25px;
-  font-size: 23px;
+  font-size: 25px;
+  font-weight: 800;
 }
 .auth-form-wrap form {
   display: flex;
@@ -151,15 +210,20 @@
   min-height: 58px;
   flex-direction: column;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 8px;
   padding: 5px 8px;
   color: var(--text-secondary);
   cursor: text;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
 }
 .floating-field:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
   color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 96%, var(--accent));
 }
 .floating-field > span {
   font-size: 14px;
@@ -231,7 +295,12 @@
   border-top-color: white;
 }
 .auth-error {
+  border-left: 3px solid var(--danger);
+  border-radius: 5px;
+  background: rgba(224, 36, 94, 0.08);
   color: var(--danger);
+  padding: 9px 11px;
+  font-size: 14px;
 }
 .forgot-link {
   display: block;
@@ -335,10 +404,17 @@
   display: flex;
   min-height: 100vh;
   justify-content: center;
-  background: var(--surface);
+  align-items: flex-start;
+  background: var(--surface-muted);
+  padding: 36px 20px;
 }
 .auth-flow-card {
   width: min(600px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 .auth-flow-card .auth-form-wrap {
   padding-top: 6px;
@@ -375,34 +451,47 @@
   }
   .landing-join {
     order: 1;
-    min-height: 510px;
+    min-height: 600px;
     padding: 30px;
   }
   .landing-benefits {
     order: 2;
-    min-height: 300px;
+    min-height: 390px;
   }
   .landing-footer {
     order: 3;
   }
   .landing-benefits ul {
-    gap: 26px;
+    width: min(520px, calc(100% - 48px));
+    gap: 24px;
   }
-  .landing-card h1 {
-    margin-bottom: 36px;
+  .landing-eyebrow {
+    margin-top: 34px;
   }
 }
 @media (max-width: 500px) {
   .landing-join {
-    min-height: 560px;
+    min-height: 610px;
     padding: 24px;
   }
   .landing-benefits {
-    min-height: 330px;
+    min-height: 440px;
     place-items: center start;
   }
-  .landing-benefits li {
+  .landing-benefits ul {
+    width: calc(100% - 36px);
+  }
+  .landing-benefits li strong {
     font-size: 17px;
+  }
+  .landing-benefits li small {
+    font-size: 13px;
+  }
+  .landing-card h1 {
+    font-size: 34px;
+  }
+  .landing-supporting-copy {
+    margin-bottom: 30px;
   }
   .cookie-notice {
     flex-direction: column;
@@ -412,5 +501,14 @@
   .auth-form-wrap {
     padding-right: 20px;
     padding-left: 20px;
+  }
+  .auth-flow-page {
+    background: var(--surface);
+    padding: 0;
+  }
+  .auth-flow-card {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 }

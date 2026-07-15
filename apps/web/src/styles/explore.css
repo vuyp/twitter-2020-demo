@@ -8,8 +8,8 @@
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 96%, transparent);
-  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
   padding: 5px 10px;
 }
 .explore-search {
@@ -21,14 +21,19 @@
   gap: 10px;
   border: 1px solid transparent;
   border-radius: 9999px;
-  background: var(--surface-hover);
+  background: var(--surface-muted);
   color: var(--text-secondary);
   padding: 0 14px;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 .explore-search:focus-within {
   border-color: var(--accent);
   background: var(--surface);
   color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 .explore-search input {
   min-width: 0;
@@ -59,6 +64,7 @@
   border-bottom: 1px solid var(--border);
   scrollbar-width: none;
   -ms-overflow-style: none;
+  scroll-snap-type: x proximity;
 }
 .explore-tabs::-webkit-scrollbar {
   display: none;
@@ -72,6 +78,10 @@
   color: var(--text-secondary);
   font-weight: 700;
   cursor: pointer;
+  scroll-snap-align: start;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
 }
 .explore-tabs button:hover {
   background: rgba(var(--accent-rgb), 0.1);
@@ -82,16 +92,17 @@
 }
 .explore-tabs button.active::after {
   position: absolute;
-  right: 0;
+  right: 20%;
   bottom: 0;
-  left: 0;
-  height: 2px;
+  left: 20%;
+  height: 3px;
+  border-radius: 9999px 9999px 0 0;
   background: var(--accent);
   content: '';
 }
 .explore-section-heading {
   display: flex;
-  min-height: 48px;
+  min-height: 52px;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
@@ -99,7 +110,8 @@
 }
 .explore-section-heading h1 {
   margin: 0;
-  font-size: 19px;
+  font-size: 20px;
+  font-weight: 800;
 }
 .explore-section-heading a {
   color: var(--accent);
@@ -112,6 +124,7 @@
   justify-content: center;
   border-bottom: 1px solid var(--border);
   padding: 10px 46px 10px 15px;
+  transition: background 140ms ease;
 }
 .explore-trend:hover {
   background: var(--surface-hover);
@@ -122,6 +135,7 @@
 }
 .explore-trend > strong {
   margin: 3px 0;
+  font-weight: 750;
 }
 .explore-trend p {
   margin: 2px 0;

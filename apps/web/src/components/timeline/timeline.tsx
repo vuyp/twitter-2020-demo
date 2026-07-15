@@ -104,7 +104,7 @@ export function Timeline({
     return <EmptyState title={emptyTitle} body={emptyBody} action={emptyAction} />;
 
   return (
-    <section className="timeline" aria-label="Timeline">
+    <section className="timeline" aria-label="Timeline" aria-busy={loadingMore}>
       {items.map((tweet) => (
         <TweetCard
           key={tweet.id}
@@ -114,7 +114,12 @@ export function Timeline({
       ))}
       <div ref={sentinel} className="timeline-sentinel">
         {loadingMore && <Spinner label="Loading more Tweets" />}
-        {error && <button onClick={() => void load(cursor)}>Try again</button>}
+        {error && (
+          <div className="timeline-load-error" role="status">
+            <span>More Tweets couldn’t load.</span>
+            <button onClick={() => void load(cursor)}>Try again</button>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -122,7 +127,8 @@ export function Timeline({
 
 export function TimelineSkeleton() {
   return (
-    <div className="timeline-loading" aria-label="Loading Tweets">
+    <div className="timeline-loading" role="status" aria-label="Loading Tweets" aria-live="polite">
+      <span className="sr-only">Loading Tweets</span>
       {Array.from({ length: 4 }).map((_, index) => (
         <div className="tweet-loading" key={index}>
           <span className="loading-avatar" />

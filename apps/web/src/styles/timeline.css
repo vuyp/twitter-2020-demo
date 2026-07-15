@@ -2,8 +2,9 @@
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
   gap: 10px;
-  border-bottom: 10px solid var(--border);
-  padding: 10px 15px 0;
+  border-bottom: 8px solid var(--surface-muted);
+  box-shadow: inset 0 -1px var(--border);
+  padding: 12px 16px 0;
 }
 .tweet-composer-modal {
   border-bottom: 0;
@@ -15,7 +16,7 @@
 .composer-body textarea {
   display: block;
   width: 100%;
-  min-height: 58px;
+  min-height: 64px;
   resize: none;
   border: 0;
   outline: 0;
@@ -45,6 +46,12 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  transition:
+    background 140ms ease,
+    transform 100ms ease;
+}
+.audience-button:hover {
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .audience-button svg {
   transform: rotate(90deg);
@@ -55,7 +62,8 @@
   top: 30px;
   left: -55px;
   width: 310px;
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
   background: var(--surface-raised);
   box-shadow: var(--shadow);
   padding: 12px 0;
@@ -121,7 +129,7 @@
 }
 .composer-toolbar {
   display: flex;
-  min-height: 50px;
+  min-height: 52px;
   align-items: center;
   justify-content: space-between;
 }
@@ -141,9 +149,15 @@
   background: transparent;
   color: var(--accent);
   cursor: pointer;
+  transition:
+    background 140ms ease,
+    transform 100ms ease;
 }
 .composer-tools button:hover {
   background: rgba(var(--accent-rgb), 0.1);
+}
+.composer-tools button:active:not(:disabled) {
+  transform: scale(0.9);
 }
 .composer-tools button:disabled {
   opacity: 0.4;
@@ -166,6 +180,7 @@
   color: var(--accent);
   cursor: pointer;
   font-weight: 700;
+  font-size: 13px;
 }
 .composer-save-draft:disabled {
   cursor: default;
@@ -221,8 +236,12 @@
   color: var(--danger);
 }
 .composer-error {
+  border-left: 3px solid var(--danger);
+  border-radius: 4px;
+  margin: 4px 0;
+  background: rgba(224, 36, 94, 0.08);
   color: var(--danger);
-  padding: 4px 0;
+  padding: 8px 10px;
   font-size: 13px;
 }
 .gif-picker-modal {
@@ -555,13 +574,26 @@
   grid-template-columns: 48px minmax(0, 1fr);
   gap: 10px;
   border-bottom: 1px solid var(--border);
-  padding: 10px 15px 0;
+  padding: 12px 16px 1px;
   outline: none;
-  transition: background 140ms ease;
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease;
 }
-.tweet-card:hover,
-.tweet-card:focus-visible {
+.tweet-card:hover {
   background: var(--surface-hover);
+}
+.tweet-card:focus-visible {
+  z-index: 1;
+  background: var(--surface-hover);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  outline: 0;
+}
+.tweet-card > a .avatar {
+  transition: filter 140ms ease;
+}
+.tweet-card > a:hover .avatar {
+  filter: brightness(0.92);
 }
 .tweet-context {
   display: flex;
@@ -591,7 +623,7 @@
 }
 .tweet-name {
   overflow: hidden;
-  font-weight: 700;
+  font-weight: 750;
   text-overflow: ellipsis;
 }
 .tweet-name:hover {
@@ -623,10 +655,17 @@
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 100ms ease;
 }
 .tweet-more:hover {
   background: rgba(var(--accent-rgb), 0.1);
   color: var(--accent);
+}
+.tweet-more:active {
+  transform: scale(0.92);
 }
 .tweet-menu {
   position: absolute;
@@ -635,7 +674,8 @@
   right: 0;
   width: 310px;
   overflow: hidden;
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   background: var(--surface-raised);
   box-shadow: var(--shadow);
 }
@@ -658,11 +698,11 @@
   color: var(--danger);
 }
 .tweet-text {
-  margin-top: 1px;
+  margin-top: 2px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 15px;
-  line-height: 20px;
+  line-height: 20.5px;
 }
 .tweet-text a,
 .tweet-detail-time span {
@@ -677,7 +717,7 @@
   height: 39px;
   align-items: center;
   justify-content: space-between;
-  margin-top: 4px;
+  margin-top: 5px;
 }
 .tweet-action {
   display: flex;
@@ -690,6 +730,7 @@
   color: var(--text-secondary);
   padding: 0;
   cursor: pointer;
+  transition: color 140ms ease;
 }
 .tweet-action > span {
   display: grid;
@@ -697,11 +738,24 @@
   height: 34px;
   place-items: center;
   border-radius: 50%;
-  transition: 140ms ease;
+  transition:
+    background 140ms ease,
+    transform 100ms ease;
 }
 .tweet-action small {
   min-width: 18px;
   font-size: 12px;
+}
+.tweet-action:disabled {
+  cursor: wait;
+}
+.tweet-action .spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+.tweet-action:active > span {
+  transform: scale(0.86);
 }
 .tweet-action.reply:hover,
 .tweet-action.share:hover {
@@ -736,7 +790,8 @@
   display: flex;
   width: 185px;
   overflow: hidden;
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   background: var(--surface-raised);
   box-shadow: var(--shadow);
   flex-direction: column;
@@ -782,7 +837,7 @@
   gap: 2px;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 18px;
   margin-top: 10px;
 }
 .tweet-media-1 {
@@ -841,8 +896,15 @@
 .quoted-tweet {
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 18px;
   margin-top: 10px;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+.quoted-tweet:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 .quoted-tweet .tweet-card {
   border: 0;
@@ -921,7 +983,7 @@
   border-radius: 9999px;
   background: linear-gradient(90deg, var(--surface-hover), var(--border), var(--surface-hover));
   background-size: 200% 100%;
-  animation: shimmer 1.2s infinite;
+  animation: shimmer 1.35s ease-in-out infinite;
 }
 .loading-avatar {
   width: 48px;
@@ -953,7 +1015,7 @@
 }
 .timeline-sentinel {
   display: grid;
-  min-height: 44px;
+  min-height: 52px;
   place-items: center;
 }
 .timeline-sentinel button {
@@ -963,14 +1025,33 @@
   font-weight: 700;
   cursor: pointer;
 }
+.timeline-load-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.timeline-load-error button {
+  min-height: 30px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9999px;
+  padding: 0 12px;
+}
 
 @media (max-width: 500px) {
   .tweet-composer:not(.tweet-composer-modal) {
     display: none;
   }
   .tweet-card {
-    padding-right: 10px;
-    padding-left: 10px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 9px;
+    padding: 11px 10px 1px;
+  }
+  .tweet-card > a .avatar {
+    width: 44px !important;
+    height: 44px !important;
   }
   .tweet-action small {
     display: none;
