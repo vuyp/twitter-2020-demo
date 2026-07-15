@@ -3,7 +3,7 @@ import { nextCookies } from 'better-auth/next-js';
 import { multiSession, twoFactor } from 'better-auth/plugins';
 import { Pool } from 'pg';
 import { authDatabaseOptions } from './auth-database-options';
-import { getServerEnv } from './env';
+import { getServerEnv, getTrustedOrigins } from './env';
 import { sendAuthEmail } from './mailer';
 
 const env = getServerEnv();
@@ -24,7 +24,7 @@ export const auth = betterAuth({
   appName: 'Twitter',
   baseURL: env.APP_URL,
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [env.APP_URL],
+  trustedOrigins: getTrustedOrigins(env),
   database: authPool,
   advanced: {
     database: authDatabaseOptions,

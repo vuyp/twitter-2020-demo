@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import type { ZodType } from 'zod';
 import { ZodError } from 'zod';
 import { ApiError, zodErrors } from './errors';
-import { getServerEnv } from './env';
+import { getServerEnv, isTrustedOrigin } from './env';
 
 export type RouteContext<T extends Record<string, string> = Record<string, string>> = {
   params: Promise<T>;
@@ -98,9 +98,7 @@ function assertSameOriginMutation(value: unknown): void {
   }
   const origin = value.headers.get('origin');
   if (!origin) return;
-  const requestOrigin = new URL(value.url).origin;
-  const configuredOrigin = new URL(getServerEnv().APP_URL).origin;
-  if (origin !== requestOrigin && origin !== configuredOrigin) {
+  if (!isTrustedOrigin(origin, getServerEnv())) {
     throw new ApiError(403, 'csrf_rejected', 'The request origin is not trusted');
   }
 }
