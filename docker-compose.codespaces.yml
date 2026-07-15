@@ -6,6 +6,9 @@ services:
     ports: !override []
 
   migrate:
+    image: twitter-2020-app:latest
+    build: !reset null
+    command: [pnpm, db:migrate]
     environment: &codespaces-public-environment
       APP_URL: ${CODESPACES_APP_URL:?Codespaces app URL was not generated}
       AUTH_REQUIRE_EMAIL_VERIFICATION: 'false'
@@ -15,10 +18,19 @@ services:
       MEDIA_PRESIGN_LIMIT: '30'
 
   web:
+    image: twitter-2020-app:latest
+    build: !reset null
+    command: [pnpm, --filter, '@twitter2020/web', start]
     environment: *codespaces-public-environment
 
   worker:
+    image: twitter-2020-app:latest
+    build: !reset null
+    command: [pnpm, --filter, '@twitter2020/worker', start]
     environment: *codespaces-public-environment
 
   realtime:
+    image: twitter-2020-app:latest
+    build: !reset null
+    command: [pnpm, --filter, '@twitter2020/realtime', start]
     environment: *codespaces-public-environment

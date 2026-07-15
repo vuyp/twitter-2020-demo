@@ -81,16 +81,16 @@ EOF
 chmod 600 "$env_temp"
 mv "$env_temp" "$env_file"
 
-compose_build_args=()
-if [ "${1:-}" = "--build" ] || ! docker image inspect twitter-2020-web:latest >/dev/null 2>&1; then
-  compose_build_args+=(--build)
+app_image="twitter-2020-app:latest"
+if [ "${1:-}" = "--build" ] || ! docker image inspect "$app_image" >/dev/null 2>&1; then
+  docker build --target build --tag "$app_image" .
 fi
 
 docker compose \
   --env-file "$env_file" \
   -f docker-compose.yml \
   -f docker-compose.codespaces.yml \
-  up "${compose_build_args[@]}" --detach --remove-orphans
+  up --no-build --detach --remove-orphans
 
 for attempt in $(seq 1 60); do
   if curl --fail --silent --show-error "http://127.0.0.1/api/health/ready" >/dev/null 2>&1; then
