@@ -1,6 +1,59 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+publish_codespaces_port_worker() {
+  local runtime_dir="${TMPDIR:-/tmp}"
+  local lock_file="${runtime_dir}/twitter-2020-codespaces-port.lock"
+  local visibility
+
+  exec 8>"$lock_file"
+  if ! flock -n 8; then
+    echo "Codespaces port publication is already running."
+    return 0
+  fi
+
+  if [ "${CODESPACES:-}" != "true" ] || [ -z "${CODESPACE_NAME:-}" ] || [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo "Codespaces credentials are unavailable; set port 80 to Public in the Ports panel."
+    return 0
+  fi
+
+  if ! command -v gh >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
+    echo "GitHub CLI or timeout is unavailable; set port 80 to Public in the Ports panel."
+    return 0
+  fi
+
+  for attempt in $(seq 1 12); do
+    GH_TOKEN="$GITHUB_TOKEN" GH_PROMPT_DISABLED=1 \
+      timeout --kill-after=2s 10s \
+      gh codespace ports visibility 80:public \
+      --codespace "$CODESPACE_NAME" >/dev/null 2>&1 || true
+
+    visibility="$(
+      GH_TOKEN="$GITHUB_TOKEN" GH_PROMPT_DISABLED=1 \
+        timeout --kill-after=2s 10s \
+        gh codespace ports \
+        --codespace "$CODESPACE_NAME" \
+        --json sourcePort,visibility \
+        --jq '.[] | select(.sourcePort == 80) | .visibility' \
+        2>/dev/null || true
+    )"
+    if [ "$visibility" = "public" ]; then
+      echo "Codespaces port 80 is public."
+      return 0
+    fi
+
+    echo "Port 80 is not public yet (attempt ${attempt}/12); retrying."
+    sleep 5
+  done
+
+  echo "Automatic port publication stopped after 12 attempts; set port 80 to Public in the Codespaces Ports panel."
+}
+
+if [ "${1:-}" = "--publish-port-worker" ]; then
+  publish_codespaces_port_worker
+  exit 0
+fi
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
@@ -103,7 +156,7 @@ for attempt in $(seq 1 60); do
   sleep 2
 done
 
-publish_codespaces_port() {
+start_codespaces_port_publisher() {
   [ "${CODESPACES:-}" = "true" ] || return 0
 
   if [ -z "${CODESPACE_NAME:-}" ] || [ -z "${GITHUB_TOKEN:-}" ]; then
@@ -111,30 +164,23 @@ publish_codespaces_port() {
     return 0
   fi
 
-  local visibility
-  for attempt in $(seq 1 12); do
-    if GH_TOKEN="$GITHUB_TOKEN" GH_PROMPT_DISABLED=1 \
-      gh codespace ports visibility 80:public \
-      --codespace "$CODESPACE_NAME" >/dev/null 2>&1; then
-      visibility="$(
-        GH_TOKEN="$GITHUB_TOKEN" GH_PROMPT_DISABLED=1 \
-          gh codespace ports \
-          --codespace "$CODESPACE_NAME" \
-          --json sourcePort,visibility \
-          --jq '.[] | select(.sourcePort == 80) | .visibility' \
-          2>/dev/null || true
-      )"
-      if [ "$visibility" = "public" ]; then
-        echo "Codespaces port 80 is public."
-        return 0
-      fi
-    fi
-    sleep 5
-  done
+  local port_log="${TMPDIR:-/tmp}/twitter-2020-codespaces-port.log"
+  touch "$port_log"
+  chmod 600 "$port_log"
 
-  echo "Port 80 could not be made public automatically; set it to Public in the Ports panel." >&2
+  if command -v setsid >/dev/null 2>&1; then
+    nohup setsid bash "$repo_root/.devcontainer/start.sh" --publish-port-worker \
+      </dev/null >>"$port_log" 2>&1 9>&- &
+  else
+    nohup bash "$repo_root/.devcontainer/start.sh" --publish-port-worker \
+      </dev/null >>"$port_log" 2>&1 9>&- &
+  fi
+  disown || true
+
+  echo "Publishing Codespaces port 80 in the background; progress is logged to ${port_log}."
+  echo "If publication fails, set port 80 to Public in the Codespaces Ports panel."
 }
 
-publish_codespaces_port
+start_codespaces_port_publisher
 
 echo "Twitter 2020 is available at ${app_url}"
