@@ -11,6 +11,9 @@ services:
     command: [pnpm, db:migrate]
     environment: &codespaces-public-environment
       APP_URL: ${CODESPACES_APP_URL:?Codespaces app URL was not generated}
+      # GitHub's public port tunnel rewrites same-origin requests to this
+      # internal HTTPS origin before forwarding them to the Codespace.
+      BETTER_AUTH_TRUSTED_ORIGINS: ${CODESPACES_APP_URL:?Codespaces app URL was not generated},https://localhost:80
       AUTH_REQUIRE_EMAIL_VERIFICATION: 'false'
       S3_PUBLIC_URL: ${CODESPACES_APP_URL:?Codespaces app URL was not generated}/media
       MEDIA_MAX_IMAGE_BYTES: '10485760'
