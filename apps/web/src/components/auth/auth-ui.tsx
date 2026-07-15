@@ -29,9 +29,10 @@ export function LoggedOutLanding() {
 
   if (loading || viewer)
     return (
-      <div className="landing-loading">
+      <main id="main-content" className="landing-loading" aria-busy={loading}>
+        <h1 className="sr-only">{loading ? 'Loading Twitter' : 'Opening Twitter'}</h1>
         <Icon name="bird" size={54} />
-      </div>
+      </main>
     );
 
   return (
