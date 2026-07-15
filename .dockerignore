@@ -1,0 +1,15 @@
+.git
+node_modules
+**/node_modules
+.next
+**/.next
+.turbo
+coverage
+playwright-report
+test-results
+data
+*.log
+.env*
+**/.env*
+.devcontainer/.generated
+!.env.example

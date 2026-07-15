@@ -1,0 +1,179 @@
+.explore-header,
+.search-page-header {
+  position: sticky;
+  z-index: 15;
+  top: 0;
+  display: flex;
+  height: 53px;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter: blur(10px);
+  padding: 5px 10px;
+}
+.explore-search {
+  display: flex;
+  min-width: 0;
+  height: 43px;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  padding: 0 14px;
+}
+.explore-search:focus-within {
+  border-color: var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+}
+.explore-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+}
+.explore-search button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+}
+.explore-header > .icon-button {
+  color: var(--accent);
+}
+.explore-tabs {
+  display: flex;
+  height: 53px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.explore-tabs::-webkit-scrollbar {
+  display: none;
+}
+.explore-tabs button {
+  position: relative;
+  min-width: 105px;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 700;
+  cursor: pointer;
+}
+.explore-tabs button:hover {
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+}
+.explore-tabs button.active {
+  color: var(--accent);
+}
+.explore-tabs button.active::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  content: '';
+}
+.explore-section-heading {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: 0 15px;
+}
+.explore-section-heading h1 {
+  margin: 0;
+  font-size: 19px;
+}
+.explore-section-heading a {
+  color: var(--accent);
+}
+.explore-trend {
+  position: relative;
+  display: flex;
+  min-height: 82px;
+  flex-direction: column;
+  justify-content: center;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 46px 10px 15px;
+}
+.explore-trend:hover {
+  background: var(--surface-hover);
+}
+.explore-trend > span {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.explore-trend > strong {
+  margin: 3px 0;
+}
+.explore-trend p {
+  margin: 2px 0;
+  color: var(--text-secondary);
+}
+.explore-trend > svg {
+  position: absolute;
+  top: 12px;
+  right: 15px;
+  color: var(--text-secondary);
+}
+.explore-loading {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+}
+.search-page-header > .icon-button:first-child {
+  color: var(--accent);
+}
+.person-result {
+  display: flex;
+  min-height: 80px;
+  align-items: flex-start;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 15px;
+}
+.person-result:hover {
+  background: var(--surface-hover);
+}
+.person-result-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.person-result small {
+  color: var(--text-secondary);
+}
+.person-result p {
+  margin: 4px 0 0;
+}
+.person-result .button {
+  min-height: 32px;
+  padding: 0 15px;
+}
+.person-result .button.following {
+  background: var(--accent);
+  color: white;
+}
+@media (max-width: 687px) {
+  .explore-tabs button {
+    min-width: 90px;
+  }
+}

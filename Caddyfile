@@ -1,0 +1,82 @@
+{
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+
+	@publicMedia {
+		path /media/*
+		method GET HEAD
+	}
+	handle @publicMedia {
+		# Use one URI operation so Caddy's directive sorting cannot apply the
+		# bucket rewrite before the /media prefix removal.
+		uri replace /media/ /twitter-media/ 1
+		reverse_proxy minio:9000 {
+			header_up Host localhost:9000
+			header_up -Origin
+			header_up -Referer
+			header_up -X-Forwarded-*
+		}
+	}
+
+	# Presigned browser uploads keep MinIO's canonical bucket path and query.
+	# Host is part of SigV4, so it must match S3_PUBLIC_ENDPOINT exactly.
+	@signedPublicUpload {
+		path /twitter-media/*
+		method PUT
+		query X-Amz-Algorithm=AWS4-HMAC-SHA256 X-Amz-Signature=*
+	}
+	handle @signedPublicUpload {
+		reverse_proxy minio:9000 {
+			header_up Host localhost:9000
+			header_up -Origin
+			header_up -Referer
+			header_up -X-Forwarded-*
+		}
+	}
+
+	# The private bucket is reachable only through a valid presigned GET or PUT.
+	@signedPrivateObject {
+		path /twitter-private/*
+		method GET PUT
+		query X-Amz-Algorithm=AWS4-HMAC-SHA256 X-Amz-Signature=*
+	}
+	handle @signedPrivateObject {
+		reverse_proxy minio:9000 {
+			header_up Host localhost:9000
+			header_up -Origin
+			header_up -Referer
+			header_up -X-Forwarded-*
+			header_down Cache-Control "private, no-store"
+		}
+	}
+
+	@otherMediaMethod path /media/*
+	handle @otherMediaMethod {
+		respond "" 405
+	}
+
+	@unsignedStoragePath path /twitter-media/* /twitter-private/*
+	handle @unsignedStoragePath {
+		respond "" 404
+	}
+
+	handle /socket.io/* {
+		reverse_proxy realtime:3001
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		Content-Security-Policy "frame-ancestors 'none'"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+}

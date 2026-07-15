@@ -1,0 +1,24 @@
+services:
+  minio:
+    ports: !override []
+
+  mailpit:
+    ports: !override []
+
+  migrate:
+    environment: &codespaces-public-environment
+      APP_URL: ${CODESPACES_APP_URL:?Codespaces app URL was not generated}
+      AUTH_REQUIRE_EMAIL_VERIFICATION: 'false'
+      S3_PUBLIC_URL: ${CODESPACES_APP_URL:?Codespaces app URL was not generated}/media
+      MEDIA_MAX_IMAGE_BYTES: '10485760'
+      MEDIA_MAX_VIDEO_BYTES: '52428800'
+      MEDIA_PRESIGN_LIMIT: '30'
+
+  web:
+    environment: *codespaces-public-environment
+
+  worker:
+    environment: *codespaces-public-environment
+
+  realtime:
+    environment: *codespaces-public-environment

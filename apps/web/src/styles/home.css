@@ -1,0 +1,85 @@
+.home-switcher-wrap {
+  position: relative;
+}
+.home-switcher-wrap > .icon-button {
+  color: var(--accent);
+}
+.home-switcher {
+  position: absolute;
+  z-index: 100;
+  top: 42px;
+  right: -6px;
+  width: 385px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+.home-switcher-hero {
+  display: flex;
+  min-height: 105px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.home-switcher-hero svg {
+  color: var(--accent);
+}
+.home-switcher > button,
+.home-switcher > a {
+  display: flex;
+  width: 100%;
+  min-height: 70px;
+  align-items: flex-start;
+  gap: 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+}
+.home-switcher > button:hover,
+.home-switcher > a:hover {
+  background: var(--surface-hover);
+}
+.home-switcher > button > svg,
+.home-switcher > a > svg {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+.home-switcher > button > span,
+.home-switcher > a > span {
+  display: flex;
+  flex-direction: column;
+}
+.home-switcher small {
+  margin-top: 3px;
+  color: var(--text-secondary);
+}
+.new-tweets-prompt {
+  display: block;
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+}
+.new-tweets-prompt:hover {
+  background: var(--surface-hover);
+}
+@media (max-width: 500px) {
+  .home-switcher {
+    position: fixed;
+    top: auto;
+    right: 10px;
+    bottom: 60px;
+    left: 10px;
+    width: auto;
+  }
+}

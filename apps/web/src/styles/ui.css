@@ -1,0 +1,152 @@
+.avatar {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: #cfd9de;
+  color: #536471;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.verified-badge {
+  display: inline-grid;
+  width: 15px;
+  height: 15px;
+  margin-left: 2px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  vertical-align: -2px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 23px;
+  height: 23px;
+  border: 2px solid rgba(var(--accent-rgb), 0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skeleton {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--surface-hover), var(--border), var(--surface-hover));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.skeleton-round {
+  border-radius: 9999px;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.modal-backdrop {
+  position: fixed;
+  z-index: 3000;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  overflow-y: auto;
+  background: var(--backdrop);
+  padding: 5vh 16px;
+}
+
+.modal-panel {
+  width: min(600px, 100%);
+  min-height: 200px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.icon-button {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  place-items: center;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+
+.icon-button:hover {
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+}
+
+.button {
+  display: inline-flex;
+  min-height: 39px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--accent);
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--accent);
+  padding: 0 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 140ms ease;
+}
+
+.button:hover {
+  background: rgba(var(--accent-rgb), 0.1);
+}
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.button-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.button-primary:hover {
+  background: color-mix(in srgb, var(--accent), #000 8%);
+}
+.button-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.button-danger:hover {
+  background: rgba(224, 36, 94, 0.1);
+}
+
+@media (max-width: 687px) {
+  .modal-backdrop {
+    padding: 0;
+  }
+  .modal-panel {
+    min-height: 100dvh;
+    border-radius: 0;
+  }
+}

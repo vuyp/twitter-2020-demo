@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: twitter_test
+          POSTGRES_USER: twitter
+          POSTGRES_PASSWORD: twitter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twitter -d twitter_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      APP_URL: http://127.0.0.1:3000
+      DATABASE_URL: postgresql://twitter:twitter@127.0.0.1:5432/twitter_test
+      REDIS_URL: redis://127.0.0.1:6379
+      BETTER_AUTH_SECRET: ci-auth-secret-with-more-than-thirty-two-characters
+      REALTIME_SHARED_SECRET: ci-realtime-secret-with-more-than-thirty-two-characters
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: twitter-media
+      S3_ACCESS_KEY: twitter
+      S3_SECRET_KEY: twitter-dev-secret
+      S3_PUBLIC_URL: http://127.0.0.1:9000/twitter-media
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm --filter @twitter2020/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @twitter2020/web exec playwright test --project desktop --grep-invert @visual

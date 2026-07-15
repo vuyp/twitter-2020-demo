@@ -1,0 +1,18 @@
+services:
+  minio:
+    ports: !override
+      - 9100:9000
+      - 9101:9001
+
+  mailpit:
+    ports: !override
+      - 8125:8025
+
+  web:
+    environment:
+      S3_PUBLIC_ENDPOINT: http://localhost:9100
+      S3_PUBLIC_URL: http://localhost:9100/twitter-media
+
+  worker:
+    environment:
+      S3_PUBLIC_URL: http://localhost:9100/twitter-media

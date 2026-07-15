@@ -1,0 +1,72 @@
+.notification-actions {
+  display: flex;
+  gap: 2px;
+}
+.notification-actions .icon-button {
+  color: var(--accent);
+}
+.notifications-loading {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+}
+.notification-row {
+  display: grid;
+  min-height: 105px;
+  grid-template-columns: 42px 1fr;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 15px;
+}
+.notification-row:hover {
+  background: var(--surface-hover);
+}
+.notification-row.unread {
+  background: rgba(var(--accent-rgb), 0.06);
+}
+.notification-icon {
+  display: flex;
+  justify-content: center;
+}
+.notification-like .notification-icon {
+  color: var(--danger);
+}
+.notification-follow .notification-icon {
+  color: #794bc4;
+}
+.notification-retweet .notification-icon {
+  color: var(--retweet);
+}
+.notification-body {
+  min-width: 0;
+}
+.notification-avatars {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+.notification-body p {
+  margin: 0 0 6px;
+}
+.notification-body p a:hover {
+  text-decoration: underline;
+}
+.notification-tweet-text {
+  display: block;
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.follow-request-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.follow-request-actions .button {
+  min-height: 32px;
+  padding: 0 15px;
+}
+.follow-request-actions span {
+  color: var(--text-secondary);
+}
