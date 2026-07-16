@@ -19,7 +19,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     credentials: 'include',
     ...init,
     headers: {
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(typeof init?.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
   });
@@ -54,30 +54,37 @@ export function useApi<T>(path: string | null, initial: T | null = null): AsyncS
   const [loading, setLoading] = useState(Boolean(path));
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
-  const active = useRef(true);
+  const initialValue = useRef(initial);
 
   const reload = useCallback(() => setVersion((value) => value + 1), []);
 
   useEffect(() => {
-    active.current = true;
     if (!path) {
+      // A disabled request should not leave stale search results or a loading state behind.
+      setData(initialValue.current);
+      setLoading(false);
+      setError(null);
       return;
     }
     const controller = new AbortController();
+    let cancelled = false;
     // A path/version change represents a new external request lifecycle.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
     apiFetch<T>(path, { signal: controller.signal })
-      .then((value) => active.current && setData(value))
+      .then((value) => {
+        if (!cancelled) setData(value);
+      })
       .catch((reason: unknown) => {
-        if (active.current && !(reason instanceof DOMException && reason.name === 'AbortError')) {
+        if (!cancelled && !(reason instanceof DOMException && reason.name === 'AbortError')) {
           setError(reason instanceof Error ? reason.message : 'Something went wrong');
         }
       })
-      .finally(() => active.current && setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
-      active.current = false;
+      cancelled = true;
       controller.abort();
     };
   }, [path, version]);

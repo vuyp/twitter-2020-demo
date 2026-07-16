@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppShell, EmptyState, ErrorState, Tabs } from '@/components/shell/app-shell';
 import { Icon } from '@/components/ui/icon';
 import { Avatar, Spinner, VerifiedBadge } from '@/components/ui/primitives';
 import { apiFetch, useApi } from '@/hooks/use-api';
 import { normalizeUser, type User } from '@/components/types';
 import { Timeline } from '@/components/timeline/timeline';
-import { useSession } from '@/components/providers/app-providers';
+import { useSession, useToast } from '@/components/providers/app-providers';
 import '@/styles/explore.css';
 
 type Trend = {
@@ -116,7 +116,13 @@ export function ExploreScreen() {
               <span>{trend.category || `${index + 1} · Trending`}</span>
               <strong>{name}</strong>
               {trend.description && <p>{trend.description}</p>}
-              {count ? <span>{count.toLocaleString()} Tweets</span> : <span>Trending now</span>}
+              {count ? (
+                <span>
+                  {count.toLocaleString()} {count === 1 ? 'Tweet' : 'Tweets'}
+                </span>
+              ) : (
+                <span>Trending now</span>
+              )}
               <Icon name="more" size={20} />
             </Link>
           );
@@ -135,6 +141,11 @@ export function SearchScreen() {
   const query = params.get('q') || '';
   const typeParam = params.get('f') || 'top';
   const [draft, setDraft] = useState(query);
+  useEffect(() => {
+    // Browser history can change the URL without remounting this search field.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraft(query);
+  }, [query]);
   const apiType = typeParam === 'photos' || typeParam === 'videos' ? 'media' : typeParam;
   const mediaFilter =
     typeParam === 'photos' ? '&media=photo' : typeParam === 'videos' ? '&media=video' : '';
@@ -260,8 +271,41 @@ function PeopleResults({
 
 function PersonResult({ user }: { user: User }) {
   const { viewer } = useSession();
+  const { showToast } = useToast();
   const router = useRouter();
   const [following, setFollowing] = useState(Boolean(user.following));
+  const [followRequested, setFollowRequested] = useState(Boolean(user.followRequested));
+  const [pending, setPending] = useState(false);
+  const changeFollow = async () => {
+    if (!viewer) {
+      router.push('/login');
+      return;
+    }
+    if (pending || viewer.id === user.id) return;
+    const wasFollowing = following;
+    const wasRequested = followRequested;
+    const active = wasFollowing || wasRequested;
+    setFollowing(active ? false : !user.protected);
+    setFollowRequested(active ? false : Boolean(user.protected));
+    setPending(true);
+    try {
+      const result = await apiFetch<{ state?: 'following' | 'requested' | 'not-following' }>(
+        `/api/v1/users/${encodeURIComponent(user.handle)}/follow`,
+        {
+          method: active ? 'DELETE' : 'POST',
+          ...(active ? {} : { body: JSON.stringify({}) }),
+        },
+      );
+      setFollowing(result.state === 'following');
+      setFollowRequested(result.state === 'requested');
+    } catch (reason) {
+      setFollowing(wasFollowing);
+      setFollowRequested(wasRequested);
+      showToast(reason instanceof Error ? reason.message : 'That follow request did not work.');
+    } finally {
+      setPending(false);
+    }
+  };
   return (
     <div className="person-result">
       <Link href={`/${user.handle}`}>
@@ -275,28 +319,27 @@ function PersonResult({ user }: { user: User }) {
         <small>@{user.handle}</small>
         {user.bio && <p>{user.bio}</p>}
       </Link>
-      <button
-        className={`button ${following ? 'following' : ''}`}
-        onClick={async (event) => {
-          event.stopPropagation();
-          if (!viewer) {
-            router.push('/login');
-            return;
-          }
-          const before = following;
-          setFollowing(!before);
-          try {
-            await apiFetch(`/api/v1/users/${user.handle}/follow`, {
-              method: before ? 'DELETE' : 'POST',
-              ...(before ? {} : { body: JSON.stringify({}) }),
-            });
-          } catch {
-            setFollowing(before);
-          }
-        }}
-      >
-        {following ? 'Following' : 'Follow'}
-      </button>
+      {viewer?.id !== user.id && (
+        <button
+          className={`button ${following || followRequested ? 'following' : ''}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            void changeFollow();
+          }}
+          disabled={pending}
+          aria-busy={pending}
+        >
+          {pending ? (
+            <Spinner label="Updating follow" />
+          ) : followRequested ? (
+            'Pending'
+          ) : following ? (
+            'Following'
+          ) : (
+            'Follow'
+          )}
+        </button>
+      )}
     </div>
   );
 }

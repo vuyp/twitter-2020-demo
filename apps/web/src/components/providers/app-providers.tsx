@@ -114,6 +114,8 @@ function SessionProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     try {
       await apiFetch('/api/auth/sign-out', { method: 'POST', body: JSON.stringify({}) });
+    } catch {
+      // Clear the local session even when the server is temporarily unreachable.
     } finally {
       setViewer(null);
       window.location.assign('/');

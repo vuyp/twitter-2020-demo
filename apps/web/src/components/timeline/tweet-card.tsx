@@ -37,6 +37,7 @@ export function TweetCard({
   const [replyOpen, setReplyOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [retweetMenuOpen, setRetweetMenuOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pendingAction, setPendingAction] = useState<'like' | 'retweet' | 'bookmark' | null>(null);
   const { viewer } = useSession();
@@ -89,6 +90,7 @@ export function TweetCard({
 
   const remove = async () => {
     if (!requireViewer()) return;
+    setDeleteConfirmOpen(false);
     setDeleting(true);
     try {
       await apiFetch(`/api/v1/tweets/${tweet.id}`, { method: 'DELETE' });
@@ -167,6 +169,12 @@ export function TweetCard({
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (
+      target !== event.currentTarget &&
+      target?.closest('a, button, input, textarea, select, video, [role="menu"]')
+    )
+      return;
     if (event.key === 'r') {
       event.preventDefault();
       if (requireViewer()) setReplyOpen(true);
@@ -248,6 +256,8 @@ export function TweetCard({
               className="tweet-more"
               onClick={() => setMenuOpen((value) => !value)}
               aria-label="More"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
             >
               <Icon name="more" size={20} />
             </button>
@@ -262,8 +272,8 @@ export function TweetCard({
                   setMenuOpen(false);
                 }}
                 onDelete={() => {
-                  void remove();
                   setMenuOpen(false);
+                  setDeleteConfirmOpen(true);
                 }}
                 onToggleFollow={() => void toggleFollowAuthor()}
                 onReport={() => void reportTweet()}
@@ -307,12 +317,14 @@ export function TweetCard({
           <div className="tweet-detail-counts">
             {tweet.retweetCount > 0 && (
               <span>
-                <strong>{tweet.retweetCount.toLocaleString()}</strong> Retweets
+                <strong>{tweet.retweetCount.toLocaleString()}</strong>{' '}
+                {tweet.retweetCount === 1 ? 'Retweet' : 'Retweets'}
               </span>
             )}
             {tweet.likeCount > 0 && (
               <span>
-                <strong>{tweet.likeCount.toLocaleString()}</strong> Likes
+                <strong>{tweet.likeCount.toLocaleString()}</strong>{' '}
+                {tweet.likeCount === 1 ? 'Like' : 'Likes'}
               </span>
             )}
           </div>
@@ -330,6 +342,7 @@ export function TweetCard({
           <span className="retweet-action-wrap">
             <ActionButton
               label="Retweet"
+              activeLabel="Undo Retweet"
               count={tweet.retweetCount}
               icon="retweet"
               className="retweet"
@@ -364,6 +377,7 @@ export function TweetCard({
           </span>
           <ActionButton
             label="Like"
+            activeLabel="Unlike"
             count={tweet.likeCount}
             icon="heart"
             className="like"
@@ -378,9 +392,22 @@ export function TweetCard({
             className="share"
             onClick={async () => {
               const url = `${window.location.origin}${statusHref}`;
-              if (navigator.share) await navigator.share({ url }).catch(() => undefined);
-              else await navigator.clipboard.writeText(url);
-              showToast('Copied to clipboard');
+              try {
+                if (navigator.share) {
+                  await navigator.share({ url });
+                  showToast('Tweet shared');
+                } else if (navigator.clipboard?.writeText) {
+                  await navigator.clipboard.writeText(url);
+                  showToast('Copied to clipboard');
+                } else {
+                  throw new Error('Copying is not available in this browser.');
+                }
+              } catch (reason) {
+                if (reason instanceof DOMException && reason.name === 'AbortError') return;
+                showToast(
+                  reason instanceof Error ? reason.message : 'This Tweet could not be shared.',
+                );
+              }
             }}
           />
         </div>
@@ -418,12 +445,33 @@ export function TweetCard({
         </div>
         <TweetComposer autoFocus modal quoteTweet={tweet} onCreated={() => setQuoteOpen(false)} />
       </Modal>
+      <Modal
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        title="Delete Tweet?"
+        className="confirm-modal"
+      >
+        <div className="confirm-dialog">
+          <h2>Delete Tweet?</h2>
+          <p>
+            This can&apos;t be undone and it will be removed from your profile, the timeline of any
+            accounts that follow you, and from Twitter search results.
+          </p>
+          <button className="button confirm-delete" onClick={() => void remove()}>
+            Delete
+          </button>
+          <button className="button confirm-cancel" onClick={() => setDeleteConfirmOpen(false)}>
+            Cancel
+          </button>
+        </div>
+      </Modal>
     </article>
   );
 }
 
 function ActionButton({
   label,
+  activeLabel,
   count,
   icon,
   className,
@@ -433,6 +481,7 @@ function ActionButton({
   onClick,
 }: {
   label: string;
+  activeLabel?: string;
   count?: number;
   icon: 'reply' | 'retweet' | 'heart' | 'share';
   className: string;
@@ -441,6 +490,7 @@ function ActionButton({
   loading?: boolean;
   onClick: () => void;
 }) {
+  const accessibleLabel = active && activeLabel ? activeLabel : label;
   return (
     <button
       className={`tweet-action ${className} ${active ? 'active' : ''}`}
@@ -450,12 +500,12 @@ function ActionButton({
         event.stopPropagation();
         onClick();
       }}
-      aria-label={`${label}${count ? ` (${count})` : ''}`}
+      aria-label={`${accessibleLabel}${count ? ` (${count})` : ''}`}
       aria-pressed={active}
     >
       <span>
         {loading ? (
-          <Spinner label={`${label} in progress`} />
+          <Spinner label={`${accessibleLabel} in progress`} />
         ) : (
           <Icon name={icon} size={19} fill={fill ? 'currentColor' : 'none'} />
         )}
@@ -555,7 +605,6 @@ function TweetMedia({ tweet }: { tweet: Tweet }) {
 function TweetPoll({ tweet, onVote }: { tweet: Tweet; onVote: (optionId: string) => void }) {
   const poll = tweet.poll;
   if (!poll) return null;
-  const max = Math.max(...poll.options.map((option) => option.votes), 1);
   return (
     <div className="tweet-poll">
       {poll.options.map((option) => (
@@ -563,7 +612,11 @@ function TweetPoll({ tweet, onVote }: { tweet: Tweet; onVote: (optionId: string)
           key={option.id}
           disabled={poll.ended || poll.options.some((item) => item.selected)}
           onClick={() => onVote(option.id)}
-          style={{ '--poll-width': `${(option.votes / max) * 100}%` } as React.CSSProperties}
+          style={
+            {
+              '--poll-width': `${poll.totalVotes ? (option.votes / poll.totalVotes) * 100 : 0}%`,
+            } as React.CSSProperties
+          }
         >
           <span>{option.label}</span>
           {poll.totalVotes > 0 && (
@@ -572,7 +625,7 @@ function TweetPoll({ tweet, onVote }: { tweet: Tweet; onVote: (optionId: string)
         </button>
       ))}
       <small>
-        {poll.totalVotes.toLocaleString()} votes ·{' '}
+        {poll.totalVotes.toLocaleString()} {poll.totalVotes === 1 ? 'vote' : 'votes'} ·{' '}
         {poll.ended ? 'Final results' : 'Poll in progress'}
       </small>
     </div>

@@ -231,7 +231,7 @@ export function MessagesScreen({ conversationId }: { conversationId?: string }) 
           )}
         </section>
       </div>
-      <NewMessageModal open={composeOpen} onClose={() => setComposeOpen(false)} />
+      {composeOpen && <NewMessageModal open onClose={() => setComposeOpen(false)} />}
     </AppShell>
   );
 }
@@ -307,6 +307,7 @@ function ConversationDetail({ id }: { id: string }) {
     data: conversationData,
     loading: conversationLoading,
     error: conversationError,
+    reload: reloadConversation,
   } = useApi<unknown>(`/api/v1/conversations/${id}`);
   const {
     data: messagesData,
@@ -443,8 +444,8 @@ function ConversationDetail({ id }: { id: string }) {
       showToast(gifOnly ? 'Choose a GIF file.' : 'Choose a JPG, PNG, or WebP image.');
       return;
     }
-    if (file.size > 15 * 1024 * 1024) {
-      showToast('Images and GIFs must be 15 MB or smaller.');
+    if (file.size === 0 || file.size > 15 * 1024 * 1024) {
+      showToast('Images and GIFs must be larger than 0 bytes and no more than 15 MB.');
       return;
     }
     if (attachment) revokeAttachmentUrl(attachment.previewUrl);
@@ -572,7 +573,8 @@ function ConversationDetail({ id }: { id: string }) {
         <Spinner />
       </div>
     );
-  if (conversationError) return <ErrorState message={conversationError} />;
+  if (conversationError)
+    return <ErrorState message={conversationError} retry={reloadConversation} />;
   return (
     <div className="conversation-detail">
       <header className="conversation-header">
@@ -603,7 +605,7 @@ function ConversationDetail({ id }: { id: string }) {
             </strong>
             <span>@{other.handle}</span>
             {other.bio && <p>{other.bio}</p>}
-            <small>You’re starting a new conversation</small>
+            {messages.length === 0 && <small>You’re starting a new conversation</small>}
           </div>
         )}
         {loading && <Spinner />}
@@ -652,7 +654,7 @@ function ConversationDetail({ id }: { id: string }) {
       <form className="message-composer" onSubmit={send}>
         <input
           ref={photoInput}
-          className="sr-only"
+          hidden
           type="file"
           accept="image/jpeg,image/png,image/webp"
           onChange={(event) => {
@@ -662,7 +664,7 @@ function ConversationDetail({ id }: { id: string }) {
         />
         <input
           ref={gifInput}
-          className="sr-only"
+          hidden
           type="file"
           accept="image/gif"
           onChange={(event) => {
@@ -782,44 +784,68 @@ function MessageMediaView({ media }: { media: MessageMedia }) {
 
 function NewMessageModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const { viewer } = useSession();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<User[]>([]);
-  const { data, loading } = useApi<unknown>(
-    query.trim().length >= 2
-      ? `/api/v1/search?q=${encodeURIComponent(query.trim())}&type=people`
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const trimmedQuery = query.trim();
+  const {
+    data,
+    loading,
+    error: searchError,
+  } = useApi<unknown>(
+    trimmedQuery.length >= 2
+      ? `/api/v1/search?q=${encodeURIComponent(trimmedQuery)}&type=people`
       : null,
   );
   const users = useMemo(
     () =>
-      listFrom(data).map((item) => {
+      listFrom(data).flatMap((item) => {
         const source = record(item);
-        return normalizeUser(source.user || item);
+        const user = normalizeUser(source.user || item);
+        return user.id && user.id !== viewer?.id ? [user] : [];
       }),
-    [data],
+    [data, viewer?.id],
   );
   const start = async () => {
-    if (!selected.length) return;
-    const created = await apiFetch<unknown>('/api/v1/conversations', {
-      method: 'POST',
-      body: JSON.stringify({ participantIds: selected.map((user) => user.id) }),
-    });
-    const conversation = normalizeConversation(created);
-    onClose();
-    router.push(`/messages/${conversation.id}`);
+    if (!selected.length || starting) return;
+    setStarting(true);
+    setStartError(null);
+    try {
+      const created = await apiFetch<unknown>('/api/v1/conversations', {
+        method: 'POST',
+        body: JSON.stringify({ participantIds: selected.map((user) => user.id) }),
+      });
+      const conversation = normalizeConversation(created);
+      if (!conversation.id) throw new Error('Twitter could not open that conversation.');
+      onClose();
+      router.push(`/messages/${conversation.id}`);
+    } catch (reason) {
+      setStartError(
+        reason instanceof Error ? reason.message : 'That conversation could not be started.',
+      );
+      setStarting(false);
+    }
   };
   return (
-    <Modal open={open} onClose={onClose} title="New message" className="new-message-modal">
+    <Modal
+      open={open}
+      onClose={starting ? () => undefined : onClose}
+      title="New message"
+      className="new-message-modal"
+    >
       <div className="new-message-header">
-        <button className="icon-button" onClick={onClose} aria-label="Close">
+        <button className="icon-button" onClick={onClose} aria-label="Close" disabled={starting}>
           <Icon name="close" />
         </button>
         <h2>New message</h2>
         <button
           className="button button-primary"
-          disabled={!selected.length}
+          disabled={!selected.length || starting}
           onClick={() => void start()}
         >
-          Next
+          {starting ? <Spinner label="Starting conversation" /> : 'Next'}
         </button>
       </div>
       <div className="new-message-search">
@@ -829,8 +855,15 @@ function NewMessageModal({ open, onClose }: { open: boolean; onClose: () => void
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search people"
+          aria-label="Search people"
+          disabled={starting}
         />
       </div>
+      {startError && (
+        <div className="composer-error" role="alert">
+          {startError}
+        </div>
+      )}
       {selected.length > 0 && (
         <div className="selected-people">
           {selected.map((user) => (
@@ -849,7 +882,11 @@ function NewMessageModal({ open, onClose }: { open: boolean; onClose: () => void
       )}
       <div className="people-results">
         {loading && <Spinner />}
-        {query.length < 2 && <p>Try searching for people by name or username.</p>}
+        {trimmedQuery.length < 2 && <p>Try searching for people by name or username.</p>}
+        {!loading && searchError && <p>{searchError}</p>}
+        {!loading && !searchError && trimmedQuery.length >= 2 && users.length === 0 && (
+          <p>No people found. Try another name or username.</p>
+        )}
         {users.map((user) => (
           <button
             key={user.id}

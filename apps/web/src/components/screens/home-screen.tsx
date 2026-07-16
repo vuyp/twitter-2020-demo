@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AppShell, PageHeader } from '@/components/shell/app-shell';
+import { useToast } from '@/components/providers/app-providers';
 import { Icon } from '@/components/ui/icon';
 import { TweetComposer } from '@/components/timeline/tweet-composer';
 import { Timeline } from '@/components/timeline/timeline';
@@ -10,11 +11,13 @@ import type { Tweet } from '@/components/types';
 import { apiFetch, useApi } from '@/hooks/use-api';
 
 export function HomeScreen() {
+  const { showToast } = useToast();
   const [mode, setMode] = useState<'top' | 'latest'>('top');
   const [menuOpen, setMenuOpen] = useState(false);
   const [created, setCreated] = useState<Tweet | null>(null);
   const [newPrompt, setNewPrompt] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [switchingMode, setSwitchingMode] = useState(false);
   const { data: settings } = useApi<{ defaultTimeline?: 'top' | 'latest' }>('/api/v1/settings');
 
   useEffect(() => {
@@ -29,6 +32,28 @@ export function HomeScreen() {
     window.addEventListener('twitter:timeline-new', onNewTweet);
     return () => window.removeEventListener('twitter:timeline-new', onNewTweet);
   }, []);
+
+  const changeTimelineMode = async () => {
+    if (switchingMode) return;
+    const previousMode = mode;
+    const nextMode = mode === 'top' ? 'latest' : 'top';
+    setMode(nextMode);
+    setMenuOpen(false);
+    setSwitchingMode(true);
+    try {
+      await apiFetch('/api/v1/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ defaultTimeline: nextMode }),
+      });
+    } catch (reason) {
+      setMode(previousMode);
+      showToast(
+        reason instanceof Error ? reason.message : 'Your timeline preference could not be saved.',
+      );
+    } finally {
+      setSwitchingMode(false);
+    }
+  };
 
   return (
     <AppShell>
@@ -54,17 +79,7 @@ export function HomeScreen() {
                       : 'Latest Tweets show up as they happen'}
                   </strong>
                 </div>
-                <button
-                  onClick={() => {
-                    const nextMode = mode === 'top' ? 'latest' : 'top';
-                    setMode(nextMode);
-                    void apiFetch('/api/v1/settings', {
-                      method: 'PATCH',
-                      body: JSON.stringify({ defaultTimeline: nextMode }),
-                    });
-                    setMenuOpen(false);
-                  }}
-                >
+                <button onClick={() => void changeTimelineMode()} disabled={switchingMode}>
                   <Icon name="retweet" size={21} />
                   <span>
                     <strong>See {mode === 'top' ? 'latest' : 'top'} Tweets instead</strong>

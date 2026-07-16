@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Avatar, Modal, Skeleton } from '@/components/ui/primitives';
 import { useSession } from '@/components/providers/app-providers';
@@ -56,6 +56,9 @@ export function AppShell({
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const shortcutPrefix = useRef(false);
+  const shortcutTimer = useRef<number | undefined>(undefined);
 
   const openCompose = useCallback(() => setComposeOpen(true), []);
   useEffect(() => {
@@ -71,9 +74,40 @@ export function AppShell({
       if (event.key === 'Escape') {
         setMoreOpen(false);
         setAccountOpen(false);
+        setMobileMenuOpen(false);
       }
       if (typing || event.altKey || event.ctrlKey || event.metaKey) return;
-      if (event.key.toLowerCase() === 'n') {
+      const key = event.key.toLowerCase();
+      if (shortcutPrefix.current) {
+        shortcutPrefix.current = false;
+        if (shortcutTimer.current) window.clearTimeout(shortcutTimer.current);
+        const destinations: Record<string, string> = {
+          h: '/home',
+          e: '/explore',
+          n: '/notifications',
+          m: '/messages',
+          b: '/i/bookmarks',
+          l: '/i/lists',
+          p: viewer?.handle ? `/${viewer.handle}` : '/settings/profile',
+          s: '/settings',
+        };
+        const destination = destinations[key];
+        if (destination) {
+          event.preventDefault();
+          router.push(destination);
+        }
+        return;
+      }
+      if (key === 'g') {
+        event.preventDefault();
+        shortcutPrefix.current = true;
+        if (shortcutTimer.current) window.clearTimeout(shortcutTimer.current);
+        shortcutTimer.current = window.setTimeout(() => {
+          shortcutPrefix.current = false;
+        }, 1_000);
+        return;
+      }
+      if (key === 'n') {
         event.preventDefault();
         openCompose();
       }
@@ -85,25 +119,29 @@ export function AppShell({
         event.preventDefault();
         setShortcutsOpen(true);
       }
-      if (event.key === 'j' || event.key === 'k') {
+      if (key === 'j' || key === 'k') {
         const cards = [...document.querySelectorAll<HTMLElement>('[data-tweet-card]')];
         if (!cards.length) return;
         const current = cards.findIndex(
           (card) => card === document.activeElement || card.contains(document.activeElement),
         );
         const next =
-          event.key === 'j'
+          key === 'j'
             ? Math.min(cards.length - 1, current + 1)
             : Math.max(0, current <= 0 ? 0 : current - 1);
         cards[next]?.focus();
       }
-      const routes: Record<string, string> = { g: '/home' };
-      const targetRoute = routes[event.key];
-      if (targetRoute) router.push(targetRoute);
+      if (key === 'm') {
+        event.preventDefault();
+        router.push('/messages');
+      }
     };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [openCompose, router]);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (shortcutTimer.current) window.clearTimeout(shortcutTimer.current);
+    };
+  }, [openCompose, router, viewer?.handle]);
 
   const navItems = useMemo(
     () => [
@@ -136,7 +174,7 @@ export function AppShell({
 
   return (
     <div
-      className={`app-frame ${hideRightSidebar ? 'app-frame-two-column' : ''} ${wide ? 'app-frame-wide' : ''}`}
+      className={`app-frame ${hideRightSidebar ? 'app-frame-two-column' : ''} ${wide ? 'app-frame-wide' : ''} ${pathname === '/home' ? 'mobile-account-home' : ''}`}
     >
       <header className="primary-rail" aria-label="Primary">
         <div className="primary-rail-inner">
@@ -151,7 +189,7 @@ export function AppShell({
                 className={`nav-link ${isActive(item) ? 'nav-link-active' : ''}`}
                 aria-current={isActive(item) ? 'page' : undefined}
               >
-                <Icon name={item.icon} size={26} />
+                <Icon name={item.icon} size={26} active={isActive(item)} />
                 <span>{item.label}</span>
               </Link>
             ))}
@@ -161,7 +199,7 @@ export function AppShell({
                 onClick={() => setMoreOpen((value) => !value)}
                 aria-expanded={moreOpen}
               >
-                <Icon name="more" size={26} />
+                <Icon name="moreCircle" size={26} active={moreOpen} />
                 <span>More</span>
               </button>
               {moreOpen && (
@@ -222,6 +260,77 @@ export function AppShell({
       </main>
       {!hideRightSidebar && <RightSidebar />}
 
+      {pathname === '/home' && (
+        <button
+          className="mobile-account-button"
+          onClick={() => setMobileMenuOpen(true)}
+          aria-label="Open account menu"
+          aria-expanded={mobileMenuOpen}
+        >
+          <Avatar user={viewer} size={32} />
+        </button>
+      )}
+
+      <Modal
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        title="Account menu"
+        className="mobile-drawer-modal"
+      >
+        <div className="mobile-drawer">
+          <div className="mobile-drawer-heading">
+            <strong>Account info</strong>
+            <button
+              className="icon-button"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close"
+            >
+              <Icon name="close" size={21} />
+            </button>
+          </div>
+          <Link
+            className="mobile-drawer-profile"
+            href={`/${viewer.handle}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <Avatar user={viewer} size={48} />
+            <strong>{viewer.name}</strong>
+            <span>@{viewer.handle}</span>
+          </Link>
+          <div className="mobile-drawer-counts">
+            <span>
+              <strong>{viewer.followingCount?.toLocaleString() || 0}</strong> Following
+            </span>
+            <span>
+              <strong>{viewer.followersCount?.toLocaleString() || 0}</strong> Followers
+            </span>
+          </div>
+          <nav className="mobile-drawer-nav" aria-label="Account navigation">
+            <Link href={`/${viewer.handle}`} onClick={() => setMobileMenuOpen(false)}>
+              <Icon name="user" size={23} /> Profile
+            </Link>
+            <Link href="/i/lists" onClick={() => setMobileMenuOpen(false)}>
+              <Icon name="list" size={23} /> Lists
+            </Link>
+            <Link href="/i/bookmarks" onClick={() => setMobileMenuOpen(false)}>
+              <Icon name="bookmark" size={23} /> Bookmarks
+            </Link>
+            <Link href="/i/topics" onClick={() => setMobileMenuOpen(false)}>
+              <Icon name="topic" size={23} /> Topics
+            </Link>
+            <Link href="/i/moments" onClick={() => setMobileMenuOpen(false)}>
+              <Icon name="moment" size={23} /> Moments
+            </Link>
+            <Link href="/settings" onClick={() => setMobileMenuOpen(false)}>
+              <Icon name="settings" size={23} /> Settings and privacy
+            </Link>
+          </nav>
+          <button className="mobile-drawer-signout" onClick={() => void signOut()}>
+            Log out @{viewer.handle}
+          </button>
+        </div>
+      </Modal>
+
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {navItems
           .filter((item) =>
@@ -235,7 +344,7 @@ export function AppShell({
               aria-current={isActive(item) ? 'page' : undefined}
               className={isActive(item) ? 'active' : ''}
             >
-              <Icon name={item.icon} size={26} />
+              <Icon name={item.icon} size={26} active={isActive(item)} />
             </Link>
           ))}
       </nav>
@@ -292,7 +401,11 @@ function GuestShell({
               href="/explore"
               className={`nav-link ${pathname === '/explore' || pathname.startsWith('/search') ? 'nav-link-active' : ''}`}
             >
-              <Icon name="explore" size={26} />
+              <Icon
+                name="explore"
+                size={26}
+                active={pathname === '/explore' || pathname.startsWith('/search')}
+              />
               <span>Explore</span>
             </Link>
           </nav>
@@ -432,6 +545,10 @@ function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () => void 
     ['t', 'Retweet'],
     ['l', 'Like'],
     ['m', 'Direct message'],
+    ['g h', 'Go to Home'],
+    ['g e', 'Go to Explore'],
+    ['g n', 'Go to Notifications'],
+    ['g s', 'Go to Settings'],
     ['?', 'This menu'],
   ];
   return (

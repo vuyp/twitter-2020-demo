@@ -15,10 +15,13 @@ FROM dependencies AS build
 COPY . .
 RUN pnpm build
 
-FROM build AS web
+FROM base AS web
 ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@twitter2020/web", "start"]
+CMD ["node", "apps/web/server.js"]
 
 FROM build AS worker
 ENV NODE_ENV=production

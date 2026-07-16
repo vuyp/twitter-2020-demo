@@ -16,6 +16,23 @@ test('logged-out experience has no automatically detectable accessibility violat
   expect(results.violations).toEqual([]);
 });
 
+test('maintenance page is available without an account', async ({ page }) => {
+  await page.goto('/maintenance');
+  await expect(page).toHaveTitle(/Maintenance \/ Twitter/);
+  await expect(
+    page.getByRole('heading', { name: 'Twitter is temporarily unavailable' }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Try again' })).toHaveAttribute('href', '/');
+});
+
+test('maintenance page has no automatically detectable accessibility violations', async ({
+  page,
+}) => {
+  await page.goto('/maintenance');
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
+});
+
 test('@visual logged-out desktop shell preserves the 2020 split layout', async ({
   page,
 }, testInfo) => {

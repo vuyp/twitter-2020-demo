@@ -88,6 +88,8 @@ export const userProfileSchema = userSummarySchema.extend({
   pinnedTweetId: entityIdSchema.nullable(),
 });
 
+const birthDateSchema = z.iso.date().refine(isValidCalendarDate, 'Enter a valid calendar date');
+
 export const updateProfileInputSchema = z.object({
   handle: handleSchema.optional(),
   name: displayNameSchema.optional(),
@@ -97,7 +99,7 @@ export const updateProfileInputSchema = z.object({
     .union([z.string().url(), z.literal('')])
     .nullable()
     .optional(),
-  birthDate: z.iso.date().nullable().optional(),
+  birthDate: birthDateSchema.nullable().optional(),
   avatarMediaId: entityIdSchema.nullable().optional(),
   bannerMediaId: entityIdSchema.nullable().optional(),
 });
@@ -106,14 +108,14 @@ export const onboardingInputSchema = z.object({
   handle: handleSchema,
   name: displayNameSchema,
   bio: z.string().max(160).optional(),
-  birthDate: z.iso
-    .date()
+  birthDate: birthDateSchema
     .refine((value) => isAtLeastAge(value, 13), 'You must be at least 13 years old')
     .optional(),
   interests: z.array(entityIdSchema).max(100).default([]),
 });
 
 function isAtLeastAge(value: string, minimumAge: number): boolean {
+  if (!isValidCalendarDate(value)) return false;
   const birthDate = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(birthDate.getTime()) || birthDate.getTime() > Date.now()) return false;
   const today = new Date();
@@ -121,6 +123,14 @@ function isAtLeastAge(value: string, minimumAge: number): boolean {
     Date.UTC(today.getUTCFullYear() - minimumAge, today.getUTCMonth(), today.getUTCDate()),
   );
   return birthDate <= threshold;
+}
+
+function isValidCalendarDate(value: string): boolean {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 0));
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day
+  );
 }
 
 export const notificationSettingsSchema = z.object({

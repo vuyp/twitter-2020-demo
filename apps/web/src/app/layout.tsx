@@ -7,6 +7,7 @@ import '@/styles/shell.css';
 import '@/styles/timeline.css';
 import '@/styles/auth.css';
 import '@/styles/home.css';
+import '@/styles/maintenance.css';
 
 export const metadata: Metadata = {
   title: { default: 'Twitter', template: '%s / Twitter' },

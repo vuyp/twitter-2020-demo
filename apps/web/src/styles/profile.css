@@ -4,7 +4,7 @@
 .profile-banner {
   height: 200px;
   overflow: hidden;
-  background: #cfd9de;
+  background: #ccd6dd;
 }
 .profile-banner img {
   width: 100%;
@@ -22,7 +22,7 @@
   position: relative;
   top: -67px;
   border: 4px solid var(--surface);
-  background: #cfd9de;
+  background: #ccd6dd;
 }
 .profile-actions {
   position: relative;
@@ -87,7 +87,7 @@
 .profile-copy {
   padding: 0 15px 15px;
 }
-.profile-copy h1 {
+.profile-copy h2 {
   display: flex;
   align-items: center;
   gap: 3px;

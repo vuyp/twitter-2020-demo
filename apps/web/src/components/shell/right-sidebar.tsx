@@ -78,9 +78,6 @@ export function RightSidebar() {
       <section className="sidebar-card" aria-labelledby="trends-title">
         <div className="sidebar-card-title">
           <h2 id="trends-title">What’s happening</h2>
-          <Link href="/settings/trends" aria-label="Trend settings">
-            <Icon name="settings" size={21} />
-          </Link>
         </div>
         {trendsLoading &&
           Array.from({ length: 3 }).map((_, i) => (
@@ -107,8 +104,17 @@ export function RightSidebar() {
                 className="trend-row"
               >
                 <span>{trend.category || 'Trending'}</span>
+                <span className="trend-more" aria-hidden="true">
+                  <Icon name="more" size={19} />
+                </span>
                 <strong>{name}</strong>
-                {count ? <span>{count.toLocaleString()} Tweets</span> : <span>Trending now</span>}
+                {count ? (
+                  <span>
+                    {count.toLocaleString()} {count === 1 ? 'Tweet' : 'Tweets'}
+                  </span>
+                ) : (
+                  <span>Trending now</span>
+                )}
               </Link>
             );
           })}
@@ -167,6 +173,7 @@ export function RightSidebar() {
         <a href="https://help.twitter.com/resources/accessibility" target="_blank" rel="noreferrer">
           Accessibility
         </a>
+        <Link href="/maintenance">Status</Link>
         <span>Unofficial UI demo · Not affiliated with Twitter/X</span>
       </nav>
     </aside>

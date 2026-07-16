@@ -271,7 +271,7 @@ export function ProfileScreen({ handle, tab = 'tweets' }: { handle: string; tab?
     <AppShell publicAccess>
       <PageHeader
         title={user.name}
-        subtitle={`${user.tweetsCount?.toLocaleString() || 0} Tweets`}
+        subtitle={`${user.tweetsCount?.toLocaleString() || 0} ${user.tweetsCount === 1 ? 'Tweet' : 'Tweets'}`}
         back
       />
       <section className="profile-header">
@@ -350,11 +350,11 @@ export function ProfileScreen({ handle, tab = 'tweets' }: { handle: string; tab?
           </div>
         </div>
         <div className="profile-copy">
-          <h1>
+          <h2>
             {user.name}
             {user.verified && <VerifiedBadge />}
             {user.protected && <Icon name="lock" size={18} />}
-          </h1>
+          </h2>
           <div className="profile-handle">
             @{user.handle}
             {user.followsYou && <span>Follows you</span>}
@@ -492,8 +492,41 @@ export function PeopleListScreen({
 
 function PeopleListRow({ user }: { user: User }) {
   const { viewer } = useSession();
+  const { showToast } = useToast();
   const router = useRouter();
   const [following, setFollowing] = useState(Boolean(user.following));
+  const [followRequested, setFollowRequested] = useState(Boolean(user.followRequested));
+  const [pending, setPending] = useState(false);
+  const changeFollow = async () => {
+    if (!viewer) {
+      router.push('/login');
+      return;
+    }
+    if (pending || viewer.id === user.id) return;
+    const wasFollowing = following;
+    const wasRequested = followRequested;
+    const active = wasFollowing || wasRequested;
+    setFollowing(active ? false : !user.protected);
+    setFollowRequested(active ? false : Boolean(user.protected));
+    setPending(true);
+    try {
+      const result = await apiFetch<{ state?: 'following' | 'requested' | 'not-following' }>(
+        `/api/v1/users/${encodeURIComponent(user.handle)}/follow`,
+        {
+          method: active ? 'DELETE' : 'POST',
+          ...(active ? {} : { body: JSON.stringify({}) }),
+        },
+      );
+      setFollowing(result.state === 'following');
+      setFollowRequested(result.state === 'requested');
+    } catch (reason) {
+      setFollowing(wasFollowing);
+      setFollowRequested(wasRequested);
+      showToast(reason instanceof Error ? reason.message : 'That follow request did not work.');
+    } finally {
+      setPending(false);
+    }
+  };
   return (
     <div className="profile-person-row">
       <Link href={`/${user.handle}`}>
@@ -507,27 +540,24 @@ function PeopleListRow({ user }: { user: User }) {
         <small>@{user.handle}</small>
         {user.bio && <p>{user.bio}</p>}
       </Link>
-      <button
-        className={`button ${following ? 'following' : ''}`}
-        onClick={async () => {
-          if (!viewer) {
-            router.push('/login');
-            return;
-          }
-          const before = following;
-          setFollowing(!before);
-          try {
-            await apiFetch(`/api/v1/users/${user.handle}/follow`, {
-              method: before ? 'DELETE' : 'POST',
-              ...(before ? {} : { body: JSON.stringify({}) }),
-            });
-          } catch {
-            setFollowing(before);
-          }
-        }}
-      >
-        {following ? 'Following' : 'Follow'}
-      </button>
+      {viewer?.id !== user.id && (
+        <button
+          className={`button ${following || followRequested ? 'following' : ''}`}
+          onClick={() => void changeFollow()}
+          disabled={pending}
+          aria-busy={pending}
+        >
+          {pending ? (
+            <Spinner label="Updating follow" />
+          ) : followRequested ? (
+            'Pending'
+          ) : following ? (
+            'Following'
+          ) : (
+            'Follow'
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -652,7 +682,10 @@ function EditProfileModal({
         name: name.trim(),
         bio: bio.trim(),
         location: location.trim(),
-        websiteUrl: website.trim(),
+        websiteUrl:
+          website.trim() && !/^https?:\/\//i.test(website.trim())
+            ? `https://${website.trim()}`
+            : website.trim(),
       };
       if (avatarMediaId) profileUpdate.avatarMediaId = avatarMediaId;
       else if (avatarRemoved) profileUpdate.avatarMediaId = null;
@@ -694,10 +727,9 @@ function EditProfileModal({
       </div>
       <input
         ref={bannerInput}
-        className="sr-only"
+        hidden
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        tabIndex={-1}
         onChange={(event) => {
           chooseImage('banner', event.target.files?.[0]);
           event.target.value = '';
@@ -705,10 +737,9 @@ function EditProfileModal({
       />
       <input
         ref={avatarInput}
-        className="sr-only"
+        hidden
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        tabIndex={-1}
         onChange={(event) => {
           chooseImage('avatar', event.target.files?.[0]);
           event.target.value = '';
@@ -834,6 +865,7 @@ function EditField({
 }
 
 export function TweetDetailScreen({ id }: { id: string }) {
+  const router = useRouter();
   const { data, loading, error, reload } = useApi<unknown>(
     `/api/v1/tweets/${encodeURIComponent(id)}`,
   );
@@ -856,7 +888,11 @@ export function TweetDetailScreen({ id }: { id: string }) {
       )}
       {tweet && (
         <>
-          <TweetCard initialTweet={tweet} detail />
+          <TweetCard
+            initialTweet={tweet}
+            detail
+            onDelete={() => router.replace(`/${tweet.author.handle}`)}
+          />
           <TweetComposer replyTo={tweet} onCreated={() => setReplyKey((value) => value + 1)} />
           <Timeline
             endpoint={`/api/v1/tweets/${id}/replies`}
