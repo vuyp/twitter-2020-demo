@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Avatar, Modal, Spinner } from '@/components/ui/primitives';
@@ -12,6 +12,17 @@ import { weightedTweetLength } from '@twitter2020/contracts';
 
 type LocalMedia = { file: File; preview: string; altText: string };
 type PollDraft = { options: string[]; days: number; hours: number; minutes: number };
+
+const TWEET_MEDIA_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'video/mp4',
+  'video/webm',
+]);
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 512 * 1024 * 1024;
 
 function localDateTimeValue(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, '0');
@@ -48,6 +59,7 @@ export function TweetComposer({
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const gifFileInput = useRef<HTMLInputElement>(null);
+  const mediaRef = useRef<LocalMedia[]>([]);
   const count = weightedTweetLength(text);
   const remaining = 280 - count;
   const pollOptions = poll?.options.map((option) => option.trim()).filter(Boolean) ?? [];
@@ -61,19 +73,47 @@ export function TweetComposer({
     !submitting &&
     !savingDraft;
 
+  useEffect(() => {
+    mediaRef.current = media;
+  }, [media]);
+  useEffect(
+    () => () => {
+      mediaRef.current.forEach((item) => URL.revokeObjectURL(item.preview));
+    },
+    [],
+  );
+
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
-    const accepted = [...files].filter(
-      (file) => file.type.startsWith('image/') || file.type.startsWith('video/'),
+    const selected = [...files];
+    if (selected.some((file) => !TWEET_MEDIA_TYPES.has(file.type))) {
+      setError('Choose a JPG, PNG, WebP, GIF, MP4, or WebM file.');
+      return;
+    }
+    if (selected.some((file) => file.size === 0)) {
+      setError('That media file is empty. Choose a different file.');
+      return;
+    }
+    const oversized = selected.find(
+      (file) => file.size > (file.type.startsWith('video/') ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES),
     );
-    const exclusive = accepted.find(
+    if (oversized) {
+      setError(
+        oversized.type.startsWith('video/')
+          ? 'Videos must be 512 MB or smaller.'
+          : 'Images and GIFs must be 15 MB or smaller.',
+      );
+      return;
+    }
+    const exclusive = selected.find(
       (file) => file.type.startsWith('video/') || file.type === 'image/gif',
     );
     if (exclusive) {
-      if (media.length || accepted.length > 1) {
+      if (media.length || selected.length > 1) {
         setError('Choose either one GIF or video, or up to four photos.');
         return;
       }
+      setError(null);
       setMedia([{ file: exclusive, preview: URL.createObjectURL(exclusive), altText: '' }]);
       return;
     }
@@ -84,12 +124,15 @@ export function TweetComposer({
       return;
     }
     const slots = Math.max(0, 4 - media.length);
+    const photos = selected.filter((file) => file.type !== 'image/gif');
+    if (photos.length > slots) {
+      setError('Choose up to four photos.');
+      return;
+    }
+    setError(null);
     setMedia((current) => [
       ...current,
-      ...accepted
-        .filter((file) => file.type !== 'image/gif')
-        .slice(0, slots)
-        .map((file) => ({ file, preview: URL.createObjectURL(file), altText: '' })),
+      ...photos.map((file) => ({ file, preview: URL.createObjectURL(file), altText: '' })),
     ]);
   };
 
@@ -235,27 +278,6 @@ export function TweetComposer({
     >
       <Avatar user={viewer} size={48} />
       <div className="composer-body">
-        {!replyTo && (
-          <div className="audience-wrap">
-            <button
-              className="audience-button"
-              onClick={() => setAudienceOpen((value) => !value)}
-              aria-expanded={audienceOpen}
-            >
-              {audienceLabel}
-              <Icon name="chevron" size={15} />
-            </button>
-            {audienceOpen && (
-              <AudienceMenu
-                value={audience}
-                onChange={(value) => {
-                  setAudience(value);
-                  setAudienceOpen(false);
-                }}
-              />
-            )}
-          </div>
-        )}
         {replyTo && (
           <div className="replying-to">
             Replying to <span>@{replyTo.author.handle}</span>
@@ -287,7 +309,11 @@ export function TweetComposer({
                 <button
                   className="media-remove"
                   onClick={() =>
-                    setMedia((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                    setMedia((current) => {
+                      const removed = current[index];
+                      if (removed) URL.revokeObjectURL(removed.preview);
+                      return current.filter((_, itemIndex) => itemIndex !== index);
+                    })
                   }
                   aria-label="Remove media"
                 >
@@ -328,19 +354,40 @@ export function TweetComposer({
             {error}
           </div>
         )}
-        <div className="reply-permission">
-          <Icon name={audience === 'everyone' ? 'globe' : 'people'} size={16} />
-          <span>{audienceLabel} can reply</span>
-        </div>
+        {!replyTo && (
+          <div className="reply-permission-wrap">
+            <button
+              type="button"
+              className="reply-permission"
+              onClick={() => setAudienceOpen((value) => !value)}
+              aria-expanded={audienceOpen}
+            >
+              <Icon name={audience === 'everyone' ? 'globe' : 'people'} size={16} />
+              <span>{audienceLabel} can reply</span>
+            </button>
+            {audienceOpen && (
+              <AudienceMenu
+                value={audience}
+                onChange={(value) => {
+                  setAudience(value);
+                  setAudienceOpen(false);
+                }}
+              />
+            )}
+          </div>
+        )}
         <div className="composer-toolbar">
           <div className="composer-tools">
             <input
               ref={fileInput}
               type="file"
-              accept="image/*,video/*"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
               multiple
               hidden
-              onChange={(event) => handleFiles(event.target.files)}
+              onChange={(event) => {
+                handleFiles(event.target.files);
+                event.currentTarget.value = '';
+              }}
             />
             <input
               ref={gifFileInput}
@@ -467,6 +514,7 @@ function GifPickerModal({
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
+    let cancelled = false;
     const timer = window.setTimeout(
       () => {
         setLoading(true);
@@ -474,17 +522,22 @@ function GifPickerModal({
         apiFetch<{ items: GifResult[] }>(`/api/v1/gifs?q=${encodeURIComponent(query.trim())}`, {
           signal: controller.signal,
         })
-          .then((result) => setItems(result.items))
+          .then((result) => {
+            if (!cancelled) setItems(result.items);
+          })
           .catch((reason: unknown) => {
-            if (!(reason instanceof DOMException && reason.name === 'AbortError')) {
+            if (!cancelled && !(reason instanceof DOMException && reason.name === 'AbortError')) {
               setError(reason instanceof Error ? reason.message : 'GIFs could not be loaded.');
             }
           })
-          .finally(() => setLoading(false));
+          .finally(() => {
+            if (!cancelled) setLoading(false);
+          });
       },
       query ? 300 : 0,
     );
     return () => {
+      cancelled = true;
       window.clearTimeout(timer);
       controller.abort();
     };
@@ -723,12 +776,19 @@ function ScheduleModal({
   onClose: () => void;
   onSave: (value: string) => void;
 }) {
-  const [mountedAt] = useState(() => new Date());
-  const defaultDate = useMemo(
-    () => initial || localDateTimeValue(new Date(mountedAt.getTime() + 3_600_000)),
-    [initial, mountedAt],
-  );
-  const [value, setValue] = useState(defaultDate);
+  const [minimum, setMinimum] = useState(() => localDateTimeValue(new Date()));
+  const [value, setValue] = useState(initial);
+  useEffect(() => {
+    if (!open) return;
+    const now = new Date();
+    // Reopening the scheduler should always use a current minimum and a fresh default.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMinimum(localDateTimeValue(now));
+    setValue(initial || localDateTimeValue(new Date(now.getTime() + 3_600_000)));
+  }, [initial, open]);
+  const selectedTime = new Date(value).getTime();
+  const minimumTime = new Date(minimum).getTime();
+  const valid = Boolean(value) && Number.isFinite(selectedTime) && selectedTime > minimumTime;
   return (
     <Modal open={open} onClose={onClose} title="Schedule Tweet" className="schedule-modal">
       <div className="schedule-heading">
@@ -736,7 +796,7 @@ function ScheduleModal({
           <Icon name="close" />
         </button>
         <h2>Schedule</h2>
-        <button className="schedule-confirm" onClick={() => onSave(value)}>
+        <button className="schedule-confirm" onClick={() => onSave(value)} disabled={!valid}>
           Confirm
         </button>
       </div>
@@ -746,7 +806,7 @@ function ScheduleModal({
           Date and time
           <input
             type="datetime-local"
-            min={localDateTimeValue(mountedAt)}
+            min={minimum}
             value={value}
             onChange={(event) => setValue(event.target.value)}
           />

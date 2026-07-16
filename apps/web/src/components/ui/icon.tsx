@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import React, { type SVGProps } from 'react';
 
 export type IconName =
   | 'bird'
@@ -10,6 +10,7 @@ export type IconName =
   | 'list'
   | 'user'
   | 'more'
+  | 'moreCircle'
   | 'search'
   | 'settings'
   | 'feather'
@@ -45,12 +46,7 @@ const paths: Partial<Record<IconName, React.ReactNode>> = {
   home: (
     <path d="M3 10.6 12 3l9 7.6v9.1a1.3 1.3 0 0 1-1.3 1.3h-5.2v-6.7h-5V21H4.3A1.3 1.3 0 0 1 3 19.7v-9.1Z" />
   ),
-  explore: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m15.8 8.2-2.3 5.3-5.3 2.3 2.3-5.3 5.3-2.3Z" />
-    </>
-  ),
+  explore: <path d="M9.5 3 7.2 21M16.8 3l-2.3 18M4 9h16M3 15h16" />,
   bell: (
     <path d="M18.5 9.7c0-3.7-2-6.2-6.5-6.2S5.5 6 5.5 9.7c0 6.3-2.3 6.3-2.3 7.8h17.6c0-1.5-2.3-1.5-2.3-7.8ZM9.4 20.2h5.2" />
   ),
@@ -78,6 +74,14 @@ const paths: Partial<Record<IconName, React.ReactNode>> = {
       <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
       <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
       <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  moreCircle: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="8" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="12" r="1" fill="currentColor" stroke="none" />
     </>
   ),
   search: (
@@ -222,11 +226,34 @@ const paths: Partial<Record<IconName, React.ReactNode>> = {
   ),
 };
 
+const activePaths: Partial<Record<IconName, React.ReactNode>> = {
+  home: (
+    <path d="M22.5 8.2 12.6 1.7a1.1 1.1 0 0 0-1.2 0L1.5 8.2a1 1 0 0 0-.5.9v11.4c0 .6.4 1 1 1h6.2v-7h7.6v7H22c.6 0 1-.4 1-1V9.1a1 1 0 0 0-.5-.9Z" />
+  ),
+  explore: (
+    <path d="M8.8 2 8.1 7H3.5v2.4h4.3l-.8 5.2H2.5V17h4.2L6 22h2.4l.7-5h5.1l-.7 5h2.4l.7-5h4.6v-2.4h-4.3l.8-5.2h4.5V7H18l.7-5h-2.4l-.7 5h-5.1l.7-5H8.8Zm1.3 7.4h5.1l-.7 5.2H9.3l.8-5.2Z" />
+  ),
+  bell: (
+    <path d="M20.7 16.3c-1.2-1.4-1.8-2.6-1.8-6 0-4-2.6-7-6.1-7.5V1h-1.6v1.8c-3.5.5-6.1 3.5-6.1 7.5 0 3.4-.6 4.6-1.8 6A2.1 2.1 0 0 0 4.9 20h4.6a2.6 2.6 0 0 0 5 0h4.6a2.1 2.1 0 0 0 1.6-3.7Z" />
+  ),
+  mail: (
+    <path d="M20.5 4h-17A2.5 2.5 0 0 0 1 6.5v11A2.5 2.5 0 0 0 3.5 20h17a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 20.5 4Zm-.6 2L12 11.6 4.1 6h15.8Z" />
+  ),
+  bookmark: <path d="M18 2H6a2 2 0 0 0-2 2v18l8-5.2 8 5.2V4a2 2 0 0 0-2-2Z" />,
+  list: (
+    <path d="M19.5 2h-15A2.5 2.5 0 0 0 2 4.5v15A2.5 2.5 0 0 0 4.5 22h15a2.5 2.5 0 0 0 2.5-2.5v-15A2.5 2.5 0 0 0 19.5 2ZM7 7h10v2H7V7Zm0 4h10v2H7v-2Zm0 4h7v2H7v-2Z" />
+  ),
+  user: (
+    <path d="M12 12.1a5.1 5.1 0 1 0 0-10.2 5.1 5.1 0 0 0 0 10.2Zm0 1.9c-5.4 0-9.8 3.3-9.8 7.3 0 .4.3.7.7.7h18.2c.4 0 .7-.3.7-.7 0-4-4.4-7.3-9.8-7.3Z" />
+  ),
+};
+
 export function Icon({
   name,
   size = 24,
+  active = false,
   ...props
-}: { name: IconName; size?: number } & SVGProps<SVGSVGElement>) {
+}: { name: IconName; size?: number; active?: boolean } & SVGProps<SVGSVGElement>) {
   if (name === 'bird') {
     return (
       <svg
@@ -238,6 +265,20 @@ export function Icon({
         {...props}
       >
         <path d="M23.3 4.7c-.8.4-1.7.6-2.6.7.9-.6 1.7-1.5 2-2.5-.9.5-1.9.9-3 1.1a4.6 4.6 0 0 0-8 4.2A13.2 13.2 0 0 1 2.2 3.4a4.6 4.6 0 0 0 1.4 6.2c-.8 0-1.5-.2-2.1-.6v.1a4.6 4.6 0 0 0 3.7 4.5c-.4.1-.8.2-1.2.2-.3 0-.6 0-.9-.1a4.6 4.6 0 0 0 4.3 3.2 9.3 9.3 0 0 1-5.7 2c-.4 0-.7 0-1.1-.1a13.1 13.1 0 0 0 7.1 2.1c8.5 0 13.2-7.1 13.2-13.2v-.6c.9-.7 1.7-1.5 2.4-2.4Z" />
+      </svg>
+    );
+  }
+  if (active && activePaths[name]) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        aria-hidden="true"
+        fill="currentColor"
+        {...props}
+      >
+        {activePaths[name]}
       </svg>
     );
   }

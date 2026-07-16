@@ -22,6 +22,42 @@ function listFrom(value: unknown) {
   return Array.isArray(value) ? value : Array.isArray(source.items) ? source.items : [];
 }
 
+function DeleteConfirmation({
+  open,
+  title,
+  body,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  title: string;
+  body: string;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal
+      open={open}
+      onClose={busy ? () => undefined : onClose}
+      title={title}
+      className="confirm-modal"
+    >
+      <div className="confirm-dialog">
+        <h2>{title}</h2>
+        <p>{body}</p>
+        <button className="button confirm-delete" disabled={busy} onClick={onConfirm}>
+          {busy ? <Spinner /> : 'Delete'}
+        </button>
+        <button className="button confirm-cancel" disabled={busy} onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 type BannerMediaDraft = { file: File; previewUrl: string };
 
 const BANNER_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -44,8 +80,8 @@ function useBannerMediaDraft() {
       showToast('Choose a JPG, PNG, or WebP image.');
       return;
     }
-    if (file.size > MAX_BANNER_BYTES) {
-      showToast('That image is larger than the 15 MB limit.');
+    if (file.size === 0 || file.size > MAX_BANNER_BYTES) {
+      showToast('Images must be larger than 0 bytes and no more than 15 MB.');
       return;
     }
     setDraft({ file, previewUrl: URL.createObjectURL(file) });
@@ -211,7 +247,8 @@ function ListRow({ list }: { list: ListSummary }) {
         </strong>
         {list.description && <p>{list.description}</p>}
         <small>
-          {list.membersCount} members · {list.followersCount} followers
+          {list.membersCount} {list.membersCount === 1 ? 'member' : 'members'} ·{' '}
+          {list.followersCount} {list.followersCount === 1 ? 'follower' : 'followers'}
         </small>
         {list.owner && (
           <small>
@@ -282,10 +319,11 @@ export function ListDetailScreen({ id }: { id: string }) {
         )}
         <div>
           <span>
-            <strong>{list.membersCount}</strong> Members
+            <strong>{list.membersCount}</strong> {list.membersCount === 1 ? 'Member' : 'Members'}
           </span>
           <span>
-            <strong>{Math.max(0, list.followersCount + followersDelta)}</strong> Followers
+            <strong>{Math.max(0, list.followersCount + followersDelta)}</strong>{' '}
+            {Math.max(0, list.followersCount + followersDelta) === 1 ? 'Follower' : 'Followers'}
           </span>
         </div>
       </div>
@@ -315,6 +353,7 @@ function ListActions({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const own = Boolean(
     viewer &&
@@ -362,7 +401,7 @@ function ListActions({
   };
 
   const deleteList = async () => {
-    if (!window.confirm('Delete this List? This can\u2019t be undone.')) return;
+    if (busy) return;
     setBusy(true);
     try {
       await apiFetch(`/api/v1/lists/${list.id}`, { method: 'DELETE' });
@@ -404,7 +443,10 @@ function ListActions({
                   className="danger"
                   role="menuitem"
                   disabled={busy}
-                  onClick={() => void deleteList()}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setDeleteConfirmOpen(true);
+                  }}
                 >
                   <Icon name="trash" size={20} />
                   Delete List
@@ -427,6 +469,14 @@ function ListActions({
           onChanged={onMembersChanged}
         />
       )}
+      <DeleteConfirmation
+        open={deleteConfirmOpen}
+        title="Delete List?"
+        body="This can’t be undone and the List will be removed from your account."
+        busy={busy}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => void deleteList()}
+      />
     </>
   );
 }
@@ -970,6 +1020,7 @@ export function MomentDetailScreen({ id }: { id: string }) {
   const [tweetId, setTweetId] = useState('');
   const [publishing, setPublishing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const moment = data ? normalizeMoment(data) : null;
   const isOwner = Boolean(
     moment &&
@@ -1032,7 +1083,7 @@ export function MomentDetailScreen({ id }: { id: string }) {
     }
   };
   const deleteMoment = async () => {
-    if (!isOwner || !window.confirm('Delete this Moment? This can\u2019t be undone.')) return;
+    if (!isOwner || deleting) return;
     setDeleting(true);
     try {
       await apiFetch(`/api/v1/moments/${id}`, { method: 'DELETE' });
@@ -1057,7 +1108,7 @@ export function MomentDetailScreen({ id }: { id: string }) {
               publishing={publishing}
               deleting={deleting}
               onPublish={publish}
-              onDelete={deleteMoment}
+              onDelete={() => setDeleteConfirmOpen(true)}
             />
           )
         }
@@ -1140,6 +1191,14 @@ export function MomentDetailScreen({ id }: { id: string }) {
           )}
         </>
       )}
+      <DeleteConfirmation
+        open={deleteConfirmOpen}
+        title="Delete Moment?"
+        body="This can’t be undone and the Moment will be removed from your account."
+        busy={deleting}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => void deleteMoment()}
+      />
     </AppShell>
   );
 }
@@ -1155,7 +1214,7 @@ function MomentOwnerActions({
   publishing: boolean;
   deleting: boolean;
   onPublish: () => Promise<void>;
-  onDelete: () => Promise<void>;
+  onDelete: () => void;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1200,7 +1259,10 @@ function MomentOwnerActions({
             className="danger"
             role="menuitem"
             disabled={deleting}
-            onClick={() => void onDelete()}
+            onClick={() => {
+              setMenuOpen(false);
+              onDelete();
+            }}
           >
             {deleting ? <Spinner /> : <Icon name="trash" size={20} />}
             Delete Moment
@@ -1278,7 +1340,37 @@ export function ConnectPeopleScreen() {
   );
 }
 function PersonRow({ user }: { user: User }) {
+  const { viewer } = useSession();
+  const { showToast } = useToast();
   const [following, setFollowing] = useState(Boolean(user.following));
+  const [followRequested, setFollowRequested] = useState(Boolean(user.followRequested));
+  const [pending, setPending] = useState(false);
+  const changeFollow = async () => {
+    if (pending || viewer?.id === user.id) return;
+    const wasFollowing = following;
+    const wasRequested = followRequested;
+    const active = wasFollowing || wasRequested;
+    setFollowing(active ? false : !user.protected);
+    setFollowRequested(active ? false : Boolean(user.protected));
+    setPending(true);
+    try {
+      const result = await apiFetch<{ state?: 'following' | 'requested' | 'not-following' }>(
+        `/api/v1/users/${encodeURIComponent(user.handle)}/follow`,
+        {
+          method: active ? 'DELETE' : 'POST',
+          ...(active ? {} : { body: JSON.stringify({}) }),
+        },
+      );
+      setFollowing(result.state === 'following');
+      setFollowRequested(result.state === 'requested');
+    } catch (reason) {
+      setFollowing(wasFollowing);
+      setFollowRequested(wasRequested);
+      showToast(reason instanceof Error ? reason.message : 'That follow request did not work.');
+    } finally {
+      setPending(false);
+    }
+  };
   return (
     <div className="connect-person">
       <Link href={`/${user.handle}`}>
@@ -1294,23 +1386,24 @@ function PersonRow({ user }: { user: User }) {
         </Link>
         {user.bio && <p>{user.bio}</p>}
       </span>
-      <button
-        className="button"
-        onClick={async () => {
-          const previous = following;
-          setFollowing(!previous);
-          try {
-            await apiFetch(`/api/v1/users/${user.handle}/follow`, {
-              method: previous ? 'DELETE' : 'POST',
-              ...(previous ? {} : { body: JSON.stringify({}) }),
-            });
-          } catch {
-            setFollowing(previous);
-          }
-        }}
-      >
-        {following ? 'Following' : 'Follow'}
-      </button>
+      {viewer?.id !== user.id && (
+        <button
+          className={`button ${following || followRequested ? 'following' : ''}`}
+          onClick={() => void changeFollow()}
+          disabled={pending}
+          aria-busy={pending}
+        >
+          {pending ? (
+            <Spinner label="Updating follow" />
+          ) : followRequested ? (
+            'Pending'
+          ) : following ? (
+            'Following'
+          ) : (
+            'Follow'
+          )}
+        </button>
+      )}
     </div>
   );
 }

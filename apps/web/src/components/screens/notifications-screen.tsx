@@ -125,22 +125,33 @@ export function NotificationsScreen({ mentions = false }: { mentions?: boolean }
 
 function NotificationRow({ item }: { item: NotificationItem }) {
   const [requestHandled, setRequestHandled] = useState<'accepted' | 'declined' | null>(null);
+  const [requestPending, setRequestPending] = useState(false);
+  const { showToast } = useToast();
   if ((item.type === 'mention' || item.type === 'reply') && item.tweet)
     return <TweetCard initialTweet={item.tweet} />;
   const first = item.actors[0];
-  const copy = notificationCopy(item.type, item.actors.length);
+  const copy = notificationCopy(item.type);
   const color = item.type.includes('like')
     ? 'like'
     : item.type.includes('follow')
       ? 'follow'
       : 'retweet';
   const respondToRequest = async (action: 'accept' | 'decline') => {
-    if (!first) return;
-    await apiFetch(`/api/v1/follow-requests/${first.id}`, {
-      method: 'POST',
-      body: JSON.stringify({ action }),
-    });
-    setRequestHandled(action === 'accept' ? 'accepted' : 'declined');
+    if (!first || requestPending) return;
+    setRequestPending(true);
+    try {
+      await apiFetch(`/api/v1/follow-requests/${first.id}`, {
+        method: 'POST',
+        body: JSON.stringify({ action }),
+      });
+      setRequestHandled(action === 'accept' ? 'accepted' : 'declined');
+    } catch (reason) {
+      showToast(
+        reason instanceof Error ? reason.message : 'That follow request could not be updated.',
+      );
+    } finally {
+      setRequestPending(false);
+    }
   };
   return (
     <article className={`notification-row notification-${color} ${item.read ? '' : 'unread'}`}>
@@ -194,11 +205,16 @@ function NotificationRow({ item }: { item: NotificationItem }) {
               <>
                 <button
                   className="button button-primary"
+                  disabled={requestPending}
                   onClick={() => void respondToRequest('accept')}
                 >
-                  Accept
+                  {requestPending ? <Spinner label="Updating follow request" /> : 'Accept'}
                 </button>
-                <button className="button" onClick={() => void respondToRequest('decline')}>
+                <button
+                  className="button"
+                  disabled={requestPending}
+                  onClick={() => void respondToRequest('decline')}
+                >
                   Decline
                 </button>
               </>
@@ -210,8 +226,9 @@ function NotificationRow({ item }: { item: NotificationItem }) {
   );
 }
 
-function notificationCopy(type: string, count: number) {
-  if (type.includes('follow')) return count > 1 ? 'followed you' : 'followed you';
+function notificationCopy(type: string) {
+  if (type === 'follow_request') return 'requested to follow you';
+  if (type.includes('follow')) return 'followed you';
   if (type.includes('like')) return 'liked your Tweet';
   if (type.includes('retweet')) return 'Retweeted your Tweet';
   if (type.includes('quote')) return 'quoted your Tweet';

@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Icon } from './icon';
 import type { User } from '@/components/types';
 
@@ -14,19 +14,17 @@ export function Avatar({
   size?: number;
   className?: string;
 }) {
-  const initials = (user?.name || 'Account')
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
   return (
     <span
       className={`avatar ${className}`}
       style={{ width: size, height: size }}
       aria-hidden="true"
     >
-      {user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : <span>{initials}</span>}
+      {user?.avatarUrl ? (
+        <img src={user.avatarUrl} alt="" />
+      ) : (
+        <Icon name="user" size={Math.max(18, Math.round(size * 0.55))} active />
+      )}
     </span>
   );
 }
@@ -34,7 +32,13 @@ export function Avatar({
 export function VerifiedBadge() {
   return (
     <span className="verified-badge" title="Verified account">
-      <Icon name="check" size={10} />
+      <svg viewBox="0 0 22 22" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M20.4 11c0-1.2-1.5-2.1-1.9-3.1-.4-1 .1-2.7-.7-3.5-.8-.8-2.5-.3-3.5-.7C13.2 3.3 12.3 1.8 11 1.8c-1.2 0-2.1 1.5-3.1 1.9-1 .4-2.7-.1-3.5.7-.8.8-.3 2.5-.7 3.5C3.3 8.9 1.8 9.8 1.8 11c0 1.2 1.5 2.1 1.9 3.1.4 1-.1 2.7.7 3.5.8.8 2.5.3 3.5.7 1 .4 1.9 1.9 3.1 1.9 1.2 0 2.1-1.5 3.1-1.9 1-.4 2.7.1 3.5-.7.8-.8.3-2.5.7-3.5.6-1 2.1-1.9 2.1-3.1Z"
+        />
+        <path fill="#fff" d="m9.2 14.8-3.3-3.3 1.4-1.4 1.9 1.9 5.5-5.5 1.4 1.4-6.9 6.9Z" />
+      </svg>
       <span className="sr-only">Verified account</span>
     </span>
   );
@@ -62,17 +66,27 @@ export function Modal({
   className?: string;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
       if (event.key === 'Tab' && panel.current) {
         const focusable = [
           ...panel.current.querySelectorAll<HTMLElement>(
             "button, a, input, textarea, select, [tabindex]:not([tabindex='-1'])",
           ),
-        ];
+        ].filter(
+          (element) =>
+            !element.hasAttribute('disabled') &&
+            element.getAttribute('aria-hidden') !== 'true' &&
+            element.getClientRects().length > 0,
+        );
         if (!focusable.length) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
@@ -88,15 +102,16 @@ export function Modal({
     };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
-    requestAnimationFrame(() =>
+    const focusFrame = requestAnimationFrame(() =>
       panel.current?.querySelector<HTMLElement>('button, input, textarea')?.focus(),
     );
     return () => {
+      cancelAnimationFrame(focusFrame);
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
       previous?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div
@@ -106,7 +121,7 @@ export function Modal({
     >
       <div
         ref={panel}
-        className={`modal-panel ${className}`}
+        className={`modal-panel${className ? ` ${className}` : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}

@@ -197,6 +197,8 @@ type SettingsPayload = {
 export function DisplaySettingsScreen() {
   const { theme, accent, fontSize, setTheme, setAccent, setFontSize } = useTheme();
   const { viewer } = useSession();
+  const { showToast } = useToast();
+  const [savingPreference, setSavingPreference] = useState(false);
   useEffect(() => {
     void apiFetch<SettingsPayload>('/api/v1/settings')
       .then((settings) => {
@@ -212,26 +214,65 @@ export function DisplaySettingsScreen() {
       })
       .catch(() => undefined);
   }, [setAccent, setFontSize, setTheme]);
-  const chooseTheme = (value: ThemeName) => {
+  const chooseTheme = async (value: ThemeName) => {
+    if (savingPreference || value === theme) return;
+    const previous = theme;
     setTheme(value);
-    void apiFetch('/api/v1/settings', { method: 'PATCH', body: JSON.stringify({ theme: value }) });
+    setSavingPreference(true);
+    try {
+      await apiFetch('/api/v1/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ theme: value }),
+      });
+    } catch (reason) {
+      setTheme(previous);
+      showToast(
+        reason instanceof Error ? reason.message : 'Your display preference could not be saved.',
+      );
+    } finally {
+      setSavingPreference(false);
+    }
   };
-  const chooseAccent = (value: AccentName) => {
+  const chooseAccent = async (value: AccentName) => {
+    if (savingPreference || value === accent) return;
+    const previous = accent;
     setAccent(value);
-    void apiFetch('/api/v1/settings', {
-      method: 'PATCH',
-      body: JSON.stringify({ accentColor: value }),
-    });
+    setSavingPreference(true);
+    try {
+      await apiFetch('/api/v1/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ accentColor: value }),
+      });
+    } catch (reason) {
+      setAccent(previous);
+      showToast(
+        reason instanceof Error ? reason.message : 'Your display preference could not be saved.',
+      );
+    } finally {
+      setSavingPreference(false);
+    }
   };
-  const chooseFont = (value: FontSizeName) => {
+  const chooseFont = async (value: FontSizeName) => {
+    if (savingPreference || value === fontSize) return;
+    const previous = fontSize;
     setFontSize(value);
     const backendValue = ({ small: 'sm', default: 'md', large: 'lg', xlarge: 'xl' } as const)[
       value
     ];
-    void apiFetch('/api/v1/settings', {
-      method: 'PATCH',
-      body: JSON.stringify({ fontSize: backendValue }),
-    });
+    setSavingPreference(true);
+    try {
+      await apiFetch('/api/v1/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ fontSize: backendValue }),
+      });
+    } catch (reason) {
+      setFontSize(previous);
+      showToast(
+        reason instanceof Error ? reason.message : 'Your display preference could not be saved.',
+      );
+    } finally {
+      setSavingPreference(false);
+    }
   };
   return (
     <AppShell>
@@ -268,7 +309,8 @@ export function DisplaySettingsScreen() {
             <button
               key={font.name}
               className={fontSize === font.name ? 'active' : ''}
-              onClick={() => chooseFont(font.name)}
+              onClick={() => void chooseFont(font.name)}
+              disabled={savingPreference}
               aria-label={`${font.name} font size`}
             >
               <span style={{ width: font.size, height: font.size }} />
@@ -285,7 +327,8 @@ export function DisplaySettingsScreen() {
               key={item.name}
               style={{ background: item.hex }}
               className={accent === item.name ? 'active' : ''}
-              onClick={() => chooseAccent(item.name)}
+              onClick={() => void chooseAccent(item.name)}
+              disabled={savingPreference}
               aria-label={item.label}
             >
               {accent === item.name && <Icon name="check" size={18} />}
@@ -301,7 +344,8 @@ export function DisplaySettingsScreen() {
               key={item.name}
               style={{ background: item.hex, color: item.name === 'light' ? '#0f1419' : '#fff' }}
               className={theme === item.name ? 'active' : ''}
-              onClick={() => chooseTheme(item.name)}
+              onClick={() => void chooseTheme(item.name)}
+              disabled={savingPreference}
             >
               <span>{theme === item.name && <Icon name="check" size={14} />}</span>
               {item.label}

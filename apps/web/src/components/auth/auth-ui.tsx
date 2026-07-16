@@ -12,6 +12,21 @@ import '@/styles/auth.css';
 
 export type AuthMode = 'login' | 'signup';
 
+function readPendingOnboarding(): Record<string, string> {
+  try {
+    const value = JSON.parse(sessionStorage.getItem('twitter-pending-onboarding') || '{}');
+    return value && typeof value === 'object' ? (value as Record<string, string>) : {};
+  } catch {
+    sessionStorage.removeItem('twitter-pending-onboarding');
+    return {};
+  }
+}
+
+function daysInBirthMonth(month: string, year: string): number {
+  if (!month) return 31;
+  return new Date(Number(year) || 2000, Number(month), 0).getDate();
+}
+
 export function LoggedOutLanding() {
   const { viewer, loading } = useSession();
   const router = useRouter();
@@ -44,24 +59,15 @@ export function LoggedOutLanding() {
         <ul>
           <li>
             <Icon name="search" size={28} />
-            <span>
-              <strong>Follow your interests.</strong>
-              <small>Build a timeline around the people and topics you care about.</small>
-            </span>
+            <strong>Follow your interests.</strong>
           </li>
           <li>
             <Icon name="people" size={28} />
-            <span>
-              <strong>Hear what people are talking about.</strong>
-              <small>See conversations and breaking stories unfold in real time.</small>
-            </span>
+            <strong>Hear what people are talking about.</strong>
           </li>
           <li>
             <Icon name="reply" size={28} />
-            <span>
-              <strong>Join the conversation.</strong>
-              <small>Share what’s happening and connect with your people.</small>
-            </span>
+            <strong>Join the conversation.</strong>
           </li>
         </ul>
       </section>
@@ -73,11 +79,7 @@ export function LoggedOutLanding() {
               Log in
             </button>
           </div>
-          <p className="landing-eyebrow">Happening now</p>
           <h1>See what’s happening in the world right now</h1>
-          <p className="landing-supporting-copy">
-            Follow the stories, voices, and moments that matter to you.
-          </p>
           <h2>Join Twitter today.</h2>
           <button className="button button-primary landing-cta" onClick={() => setMode('signup')}>
             Sign up
@@ -464,12 +466,11 @@ function AuthForm({
   const [trustDevice, setTrustDevice] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const birthDayCount = daysInBirthMonth(birthMonth, birthYear);
 
   const completeLogin = async (preservePendingOnboarding = false) => {
     await refresh();
-    const pending = JSON.parse(
-      sessionStorage.getItem('twitter-pending-onboarding') || '{}',
-    ) as Record<string, string>;
+    const pending = readPendingOnboarding();
     const samePendingAccount = pending.email?.toLowerCase() === email.trim().toLowerCase();
     if (!samePendingAccount) sessionStorage.removeItem('twitter-pending-onboarding');
     router.push(samePendingAccount ? '/i/flow/onboarding' : '/home');
@@ -722,7 +723,12 @@ function AuthForm({
                   Month
                   <select
                     value={birthMonth}
-                    onChange={(event) => setBirthMonth(event.target.value)}
+                    onChange={(event) => {
+                      const nextMonth = event.target.value;
+                      setBirthMonth(nextMonth);
+                      if (Number(birthDay) > daysInBirthMonth(nextMonth, birthYear))
+                        setBirthDay('');
+                    }}
                     required
                   >
                     <option value="">Month</option>
@@ -741,7 +747,7 @@ function AuthForm({
                     required
                   >
                     <option value="">Day</option>
-                    {Array.from({ length: 31 }).map((_, index) => (
+                    {Array.from({ length: birthDayCount }).map((_, index) => (
                       <option key={index + 1} value={index + 1}>
                         {index + 1}
                       </option>
@@ -752,7 +758,12 @@ function AuthForm({
                   Year
                   <select
                     value={birthYear}
-                    onChange={(event) => setBirthYear(event.target.value)}
+                    onChange={(event) => {
+                      const nextYear = event.target.value;
+                      setBirthYear(nextYear);
+                      if (Number(birthDay) > daysInBirthMonth(birthMonth, nextYear))
+                        setBirthDay('');
+                    }}
                     required
                   >
                     <option value="">Year</option>
@@ -894,9 +905,7 @@ function Footer() {
       <a href="https://blog.twitter.com/" target="_blank" rel="noreferrer">
         Blog
       </a>
-      <a href="https://status.twitterstat.us/" target="_blank" rel="noreferrer">
-        Status
-      </a>
+      <Link href="/maintenance">Status</Link>
       <a href="https://careers.twitter.com/" target="_blank" rel="noreferrer">
         Careers
       </a>

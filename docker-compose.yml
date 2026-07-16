@@ -118,7 +118,7 @@ services:
       minio-init:
         condition: service_completed_successfully
     healthcheck:
-      test: [CMD, wget, -qO-, http://localhost:3000/api/health/live]
+      test: [CMD, wget, -qO-, http://127.0.0.1:3000/api/health/live]
       interval: 10s
       timeout: 5s
       retries: 20
