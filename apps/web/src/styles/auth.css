@@ -295,12 +295,12 @@
   border-top-color: white;
 }
 .auth-error {
-  border-left: 3px solid var(--danger);
-  border-radius: 5px;
-  background: rgba(224, 36, 94, 0.08);
+  border: 0;
+  background: transparent;
   color: var(--danger);
-  padding: 9px 11px;
-  font-size: 14px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 17px;
 }
 .forgot-link {
   display: block;

@@ -39,18 +39,17 @@ export type IconName =
   | 'external'
   | 'warning'
   | 'people'
-  | 'eye';
+  | 'eye'
+  | 'info'
+  | 'send'
+  | 'mail-add'
+  | 'refresh';
 
 const paths: Partial<Record<IconName, React.ReactNode>> = {
   home: (
     <path d="M3 10.6 12 3l9 7.6v9.1a1.3 1.3 0 0 1-1.3 1.3h-5.2v-6.7h-5V21H4.3A1.3 1.3 0 0 1 3 19.7v-9.1Z" />
   ),
-  explore: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m15.8 8.2-2.3 5.3-5.3 2.3 2.3-5.3 5.3-2.3Z" />
-    </>
-  ),
+  explore: <path d="M10 3 8 21M16 3l-2 18M4.5 9h15M3.5 15h15" />,
   bell: (
     <path d="M18.5 9.7c0-3.7-2-6.2-6.5-6.2S5.5 6 5.5 9.7c0 6.3-2.3 6.3-2.3 7.8h17.6c0-1.5-2.3-1.5-2.3-7.8ZM9.4 20.2h5.2" />
   ),
@@ -220,13 +219,60 @@ const paths: Partial<Record<IconName, React.ReactNode>> = {
       <circle cx="12" cy="12" r="3" />
     </>
   ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 10.5V17m0-10h.01" />
+    </>
+  ),
+  send: <path d="m21 3-7.4 18-3.2-7.4L3 10.4 21 3Zm-10.6 10.6L21 3" />,
+  'mail-add': (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m4 7 8 6 8-6M18 2v6m-3-3h6" />
+    </>
+  ),
+  refresh: (
+    <path d="M20 6v5h-5M4 18v-5h5m10.2-2a7.5 7.5 0 0 0-13-3L4 11m16 2-2.2 3a7.5 7.5 0 0 1-13-3" />
+  ),
+};
+
+const filledPaths: Partial<Record<IconName, React.ReactNode>> = {
+  home: (
+    <path d="M21.7 8.1 12.6 1.4a1 1 0 0 0-1.2 0L2.3 8.1a1 1 0 0 0-.4.8v11.2c0 .5.4.9.9.9h6.1v-7.1h6.2V21h6.1c.5 0 .9-.4.9-.9V8.9a1 1 0 0 0-.4-.8Z" />
+  ),
+  bell: (
+    <path d="M21 18.2c-1.7-1.7-2.2-3.1-2.2-7.1C18.8 5.7 16.2 3 12 3S5.2 5.7 5.2 11.1c0 4-.5 5.4-2.2 7.1-.3.3-.1.8.4.8h5.2a3.5 3.5 0 0 0 6.8 0h5.2c.5 0 .7-.5.4-.8Z" />
+  ),
+  mail: (
+    <>
+      <rect x="2" y="4" width="20" height="16" rx="2.5" />
+      <path d="m3.5 6 8.5 6.4L20.5 6" fill="none" stroke="var(--surface)" strokeWidth="1.8" />
+    </>
+  ),
+  bookmark: <path d="M5 3.8C5 2.8 5.8 2 6.8 2h10.4c1 0 1.8.8 1.8 1.8V22l-7-4.7L5 22V3.8Z" />,
+  list: (
+    <>
+      <rect x="3" y="2" width="18" height="20" rx="2.5" />
+      <path
+        d="M7.5 7.5h9m-9 4.5h9m-9 4.5h6"
+        fill="none"
+        stroke="var(--surface)"
+        strokeWidth="1.7"
+      />
+    </>
+  ),
+  user: (
+    <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 1.5c-5.2 0-9 3.1-9 7.2 0 .7.6 1.3 1.3 1.3h15.4c.7 0 1.3-.6 1.3-1.3 0-4.1-3.8-7.2-9-7.2Z" />
+  ),
 };
 
 export function Icon({
   name,
   size = 24,
+  active = false,
   ...props
-}: { name: IconName; size?: number } & SVGProps<SVGSVGElement>) {
+}: { name: IconName; size?: number; active?: boolean } & SVGProps<SVGSVGElement>) {
   if (name === 'bird') {
     return (
       <svg
@@ -241,6 +287,21 @@ export function Icon({
       </svg>
     );
   }
+  const filledPath = active ? filledPaths[name] : undefined;
+  if (filledPath) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        aria-hidden="true"
+        fill="currentColor"
+        {...props}
+      >
+        {filledPath}
+      </svg>
+    );
+  }
   return (
     <svg
       viewBox="0 0 24 24"
@@ -249,7 +310,7 @@ export function Icon({
       aria-hidden="true"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth={active ? 2.35 : 1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
       {...props}

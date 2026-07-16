@@ -3,7 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/hooks/use-api';
 import { normalizeUser, type User } from '@/components/types';
-import { io } from 'socket.io-client';
+import { io, type Socket } from 'socket.io-client';
+import { REALTIME_RETRY_DELAY_MS, realtimeTokenRefreshDelay } from './realtime-client';
 
 export type ThemeName = 'light' | 'dim' | 'lights-out';
 export type AccentName = 'blue' | 'yellow' | 'pink' | 'purple' | 'orange' | 'green';
@@ -132,55 +133,131 @@ function RealtimeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!viewer) return;
     let disposed = false;
-    let disconnect: (() => void) | undefined;
-    const connect = async () => {
-      try {
-        const payload = await apiFetch<{ token: string; url?: string }>('/api/v1/realtime-token');
-        if (disposed || !payload.token) return;
-        const socket = io(payload.url || window.location.origin, {
-          path: '/socket.io',
-          auth: { token: payload.token },
-          transports: ['websocket', 'polling'],
-          reconnection: true,
-        });
-        const announce = (name: string, detail?: unknown) =>
-          window.dispatchEvent(new CustomEvent(name, { detail }));
-        socket.on('timeline.new', (event) => announce('twitter:timeline-new', event));
-        socket.on('notification.created', (event) => announce('twitter:notification-new', event));
-        socket.on('notification.read', (event) => announce('twitter:notification-read', event));
-        socket.on('dm.created', (event) => announce('twitter:dm-new', event));
-        socket.on('dm.read', (event) => announce('twitter:dm-read', event));
-        socket.on('typing.started', (event) => announce('twitter:typing-started', event));
-        socket.on('typing.stopped', (event) => announce('twitter:typing-stopped', event));
-        const emitRealtimeEvent = (event: Event) => {
-          const detail = event instanceof CustomEvent ? event.detail : undefined;
-          if (!detail || typeof detail.name !== 'string') return;
-          if (
-            !['typing.started', 'typing.stopped', 'dm.read', 'notification.read'].includes(
-              detail.name,
-            )
-          )
-            return;
-          socket.emit(detail.name, detail.payload);
-        };
-        window.addEventListener('twitter:realtime-emit', emitRealtimeEvent);
-        socket.io.on('reconnect', () => {
-          announce('twitter:timeline-new');
-          announce('twitter:notification-new');
-          announce('twitter:dm-new');
-        });
-        disconnect = () => {
-          window.removeEventListener('twitter:realtime-emit', emitRealtimeEvent);
-          socket.disconnect();
-        };
-      } catch {
-        // REST remains fully usable when the realtime service is unavailable.
-      }
+    let socket: Socket | undefined;
+    let renewalTimer: number | undefined;
+    let retryTimer: number | undefined;
+    let refreshInFlight: Promise<void> | undefined;
+    let hasConnected = false;
+    let emitRealtimeEvent: ((event: Event) => void) | undefined;
+
+    const announce = (name: string, detail?: unknown) =>
+      window.dispatchEvent(new CustomEvent(name, { detail }));
+
+    const announceRefresh = () => {
+      announce('twitter:timeline-new');
+      announce('twitter:notification-new');
+      announce('twitter:dm-new');
     };
-    void connect();
+
+    const scheduleRetry = (delay = REALTIME_RETRY_DELAY_MS) => {
+      if (disposed || retryTimer !== undefined) return;
+      retryTimer = window.setTimeout(() => {
+        retryTimer = undefined;
+        void refreshConnection(true);
+      }, delay);
+    };
+
+    const scheduleRenewal = (expiresAt: string) => {
+      if (renewalTimer !== undefined) window.clearTimeout(renewalTimer);
+      renewalTimer = window.setTimeout(() => {
+        renewalTimer = undefined;
+        void refreshConnection(true);
+      }, realtimeTokenRefreshDelay(expiresAt));
+    };
+
+    const bindSocket = (activeSocket: Socket) => {
+      activeSocket.on('timeline.new', (event) => announce('twitter:timeline-new', event));
+      activeSocket.on('notification.created', (event) =>
+        announce('twitter:notification-new', event),
+      );
+      activeSocket.on('notification.read', (event) => announce('twitter:notification-read', event));
+      activeSocket.on('dm.created', (event) => announce('twitter:dm-new', event));
+      activeSocket.on('dm.read', (event) => announce('twitter:dm-read', event));
+      activeSocket.on('typing.started', (event) => announce('twitter:typing-started', event));
+      activeSocket.on('typing.stopped', (event) => announce('twitter:typing-stopped', event));
+      activeSocket.on('connect', () => {
+        if (disposed) return;
+        if (retryTimer !== undefined) {
+          window.clearTimeout(retryTimer);
+          retryTimer = undefined;
+        }
+        announce('twitter:realtime-status', { status: 'connected' });
+        if (hasConnected) announceRefresh();
+        hasConnected = true;
+      });
+      activeSocket.on('connect_error', () => {
+        if (disposed) return;
+        announce('twitter:realtime-status', { status: 'unavailable' });
+        scheduleRetry();
+      });
+      activeSocket.on('disconnect', (reason) => {
+        if (disposed) return;
+        announce('twitter:realtime-status', { status: 'unavailable' });
+        // A server-forced disconnect does not trigger Socket.IO's automatic reconnect.
+        if (reason === 'io server disconnect') scheduleRetry(0);
+      });
+
+      emitRealtimeEvent = (event: Event) => {
+        const detail = event instanceof CustomEvent ? event.detail : undefined;
+        if (!detail || typeof detail.name !== 'string') return;
+        if (
+          !['typing.started', 'typing.stopped', 'dm.read', 'notification.read'].includes(
+            detail.name,
+          )
+        )
+          return;
+        activeSocket.emit(detail.name, detail.payload);
+      };
+      window.addEventListener('twitter:realtime-emit', emitRealtimeEvent);
+    };
+
+    async function connectWithFreshToken(forceReconnect: boolean): Promise<void> {
+      try {
+        const payload = await apiFetch<{ token: string; expiresAt: string; url?: string }>(
+          '/api/v1/realtime-token',
+        );
+        if (disposed || !payload.token) return;
+        if (!socket) {
+          socket = io(payload.url || window.location.origin, {
+            path: '/socket.io',
+            auth: { token: payload.token },
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            autoConnect: false,
+          });
+          bindSocket(socket);
+        }
+        socket.auth = { token: payload.token };
+        if (forceReconnect && socket.connected) socket.disconnect();
+        if (!socket.connected) socket.connect();
+        scheduleRenewal(payload.expiresAt);
+      } catch {
+        // REST remains usable, and the UI never exposes infrastructure error text.
+        if (!disposed) {
+          announce('twitter:realtime-status', { status: 'unavailable' });
+          scheduleRetry();
+        }
+      }
+    }
+
+    function refreshConnection(forceReconnect = false): Promise<void> {
+      if (refreshInFlight) return refreshInFlight;
+      const operation = connectWithFreshToken(forceReconnect);
+      refreshInFlight = operation;
+      const clear = () => {
+        if (refreshInFlight === operation) refreshInFlight = undefined;
+      };
+      void operation.then(clear, clear);
+      return operation;
+    }
+
+    void refreshConnection();
     return () => {
       disposed = true;
-      disconnect?.();
+      if (renewalTimer !== undefined) window.clearTimeout(renewalTimer);
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      if (emitRealtimeEvent) window.removeEventListener('twitter:realtime-emit', emitRealtimeEvent);
+      socket?.disconnect();
     };
   }, [viewer]);
   return children;

@@ -54,6 +54,28 @@ Stop it when nobody is testing and delete it when the demo is finished. Data per
 Codespace's Docker volumes until that Codespace is deleted; this is a temporary demo deployment,
 not a production hosting setup.
 
+The bundled Caddy gateway supplies the effective public origin used by auth, REST, and realtime
+checks. If you replace it with another reverse proxy, configure that edge to overwrite (not append
+client-provided values to) `X-Forwarded-Host` and `X-Forwarded-Proto`.
+
+## Maintenance mode
+
+The maintenance switch is hot-reloaded by both the web and realtime services, including in a
+Codespace. It serves Twitter's 2020 blue fail-robot page with HTTP 503, returns structured 503 JSON
+from APIs, and rejects realtime connections while leaving Docker health checks available.
+
+```powershell
+pnpm maintenance:on
+pnpm maintenance:status
+pnpm maintenance:off
+```
+
+No rebuild or container restart is needed. The switch lives in the ignored
+`.runtime/maintenance` file, which Compose mounts read-only into the services. For platforms where
+a mounted runtime file is not available, set `MAINTENANCE_MODE=true` as a deploy-time override and
+restart the web and realtime processes. An environment override set to `true` takes precedence over
+the hot switch, so remove it before using `maintenance:off`.
+
 ## Local development
 
 Node 22 or newer and pnpm 11 are required. Start PostgreSQL, Redis, an S3-compatible object store,

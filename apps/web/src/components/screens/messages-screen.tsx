@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell, EmptyState, ErrorState } from '@/components/shell/app-shell';
 import { Icon } from '@/components/ui/icon';
 import { Avatar, Modal, Spinner, VerifiedBadge } from '@/components/ui/primitives';
@@ -45,6 +45,8 @@ type LocalAttachment = { file: File; previewUrl: string; mediaId?: string };
 type Conversation = {
   id: string;
   participants: User[];
+  name: string | null;
+  avatarUrl: string | null;
   lastMessage?: Message | null;
   updatedAt?: string;
   unreadCount: number;
@@ -116,6 +118,8 @@ function normalizeConversation(value: unknown): Conversation {
   return {
     id: String(source.id || ''),
     participants,
+    name: typeof source.name === 'string' ? source.name : null,
+    avatarUrl: safeMediaUrl(source.avatarUrl) || null,
     lastMessage: source.lastMessage ? normalizeMessage(source.lastMessage) : null,
     updatedAt: String(source.updatedAt || ''),
     unreadCount: Number(source.unreadCount) || 0,
@@ -168,7 +172,7 @@ export function MessagesScreen({ conversationId }: { conversationId?: string }) 
                 onClick={() => setComposeOpen(true)}
                 aria-label="New message"
               >
-                <Icon name="mail" size={21} />
+                <Icon name="mail-add" size={22} />
               </button>
             </div>
           </div>
@@ -246,7 +250,14 @@ function ConversationRow({
   const { viewer } = useSession();
   const others = conversation.participants.filter((person) => person.id !== viewer?.id);
   const lead = others[0] || conversation.participants[0];
-  const title = others.map((person) => person.name).join(', ') || 'Conversation';
+  const isGroup = conversation.participants.length > 2;
+  const title =
+    (isGroup ? conversation.name?.trim() : '') ||
+    others.map((person) => person.name).join(', ') ||
+    'Conversation';
+  const lastSender =
+    conversation.lastMessage?.sender ||
+    conversation.participants.find((person) => person.id === conversation.lastMessage?.senderId);
   const lastMessagePreview = conversation.lastMessage?.text
     ? conversation.lastMessage.text
     : conversation.lastMessage?.media[0]?.type === 'gif'
@@ -256,17 +267,25 @@ function ConversationRow({
         : conversation.lastMessage?.media.length
           ? 'Sent a photo'
           : 'No messages yet';
+  const preview =
+    isGroup && conversation.lastMessage && lastSender
+      ? `${lastSender.id === viewer?.id ? 'You' : lastSender.name}: ${lastMessagePreview}`
+      : lastMessagePreview;
   return (
     <Link
       href={`/messages/${conversation.id}`}
       className={`conversation-row ${selected ? 'selected' : ''}`}
     >
-      <Avatar user={lead} size={48} />
+      <ConversationAvatar
+        users={isGroup ? others : lead ? [lead] : []}
+        size={48}
+        imageUrl={isGroup ? conversation.avatarUrl : null}
+      />
       <span className="conversation-copy">
         <span>
           <strong>{title}</strong>
-          {lead?.verified && <VerifiedBadge />}
-          <small>{lead?.handle ? ` @${lead.handle}` : ''}</small>
+          {!isGroup && lead?.verified && <VerifiedBadge />}
+          {!isGroup && <small>{lead?.handle ? ` @${lead.handle}` : ''}</small>}
           {conversation.updatedAt && (
             <time>
               {new Date(conversation.updatedAt).toLocaleDateString(undefined, {
@@ -276,7 +295,7 @@ function ConversationRow({
             </time>
           )}
         </span>
-        <span className={conversation.unreadCount ? 'unread-copy' : ''}>{lastMessagePreview}</span>
+        <span className={conversation.unreadCount ? 'unread-copy' : ''}>{preview}</span>
       </span>
       {conversation.unreadCount > 0 && (
         <b className="unread-dot">
@@ -284,6 +303,48 @@ function ConversationRow({
         </b>
       )}
     </Link>
+  );
+}
+
+function ConversationAvatar({
+  users,
+  size,
+  imageUrl,
+}: {
+  users: User[];
+  size: number;
+  imageUrl: string | null | undefined;
+}) {
+  if (imageUrl) {
+    return (
+      <span
+        className="avatar conversation-custom-avatar"
+        style={{
+          width: size,
+          height: size,
+          minWidth: size,
+          minHeight: size,
+          maxWidth: size,
+          maxHeight: size,
+        }}
+        aria-hidden="true"
+      >
+        <img src={imageUrl} alt="" />
+      </span>
+    );
+  }
+  if (users.length <= 1) return <Avatar user={users[0]} size={size} />;
+
+  const itemSize = Math.round(size * 0.7);
+  return (
+    <span
+      className="conversation-group-avatar"
+      style={{ width: size, height: size, minWidth: size, minHeight: size }}
+      aria-hidden="true"
+    >
+      <Avatar user={users[0]} size={itemSize} className="conversation-group-avatar-back" />
+      <Avatar user={users[1]} size={itemSize} className="conversation-group-avatar-front" />
+    </span>
   );
 }
 
@@ -295,6 +356,8 @@ function ConversationDetail({ id }: { id: string }) {
   const [attachment, setAttachment] = useState<LocalAttachment | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
+  const [participantsOpen, setParticipantsOpen] = useState(false);
+  const closeConversationInfo = useCallback(() => setParticipantsOpen(false), []);
   const photoInput = useRef<HTMLInputElement>(null);
   const gifInput = useRef<HTMLInputElement>(null);
   const textInput = useRef<HTMLTextAreaElement>(null);
@@ -326,9 +389,15 @@ function ConversationDetail({ id }: { id: string }) {
   }, [serverMessages, optimistic]);
   const bottom = useRef<HTMLDivElement>(null);
   const lastReadRequest = useRef<string | null>(null);
-  const other =
-    conversation?.participants.find((person) => person.id !== viewer?.id) ||
-    conversation?.participants[0];
+  const participants = conversation?.participants || [];
+  const others = participants.filter((person) => person.id !== viewer?.id);
+  const isGroup = participants.length > 2;
+  const other = others[0] || participants[0];
+  const conversationTitle =
+    (isGroup ? conversation?.name?.trim() : '') ||
+    others.map((person) => person.name).join(', ') ||
+    other?.name ||
+    'Conversation';
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
@@ -579,22 +648,49 @@ function ConversationDetail({ id }: { id: string }) {
         <Link className="icon-button mobile-conversation-back" href="/messages" aria-label="Back">
           <Icon name="back" />
         </Link>
-        <Avatar user={other} size={32} />
-        <span>
-          <strong>{other?.name || 'Conversation'}</strong>
-          {other?.verified && <VerifiedBadge />}
-          <small>{other?.handle ? `@${other.handle}` : ''}</small>
+        <ConversationAvatar
+          users={isGroup ? others : other ? [other] : []}
+          size={32}
+          imageUrl={isGroup ? conversation?.avatarUrl : null}
+        />
+        <span className="conversation-header-copy">
+          <span className="conversation-header-title">
+            <strong>{conversationTitle}</strong>
+            {!isGroup && other?.verified && <VerifiedBadge />}
+          </span>
+          <small>
+            {isGroup ? `${participants.length} people` : other?.handle ? `@${other.handle}` : ''}
+          </small>
         </span>
-        <Link
-          className="icon-button"
-          href={other?.handle ? `/${other.handle}` : '/messages'}
-          aria-label="Conversation information"
-        >
-          <Icon name="user" size={21} />
-        </Link>
+        {isGroup ? (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Conversation information"
+            aria-expanded={participantsOpen}
+            onClick={() => setParticipantsOpen(true)}
+          >
+            <Icon name="info" size={21} />
+          </button>
+        ) : (
+          <Link
+            className="icon-button"
+            href={other?.handle ? `/${other.handle}` : '/messages'}
+            aria-label="Conversation information"
+          >
+            <Icon name="info" size={21} />
+          </Link>
+        )}
       </header>
       <div className="message-thread">
-        {other && (
+        {isGroup ? (
+          <div className="conversation-intro conversation-group-intro">
+            <ConversationAvatar users={others} size={64} imageUrl={conversation?.avatarUrl} />
+            <strong>{conversationTitle}</strong>
+            <span>{others.map((person) => `@${person.handle}`).join(', ')}</span>
+            <small>{participants.length} people in this conversation</small>
+          </div>
+        ) : other ? (
           <div className="conversation-intro">
             <Avatar user={other} size={64} />
             <strong>
@@ -605,25 +701,53 @@ function ConversationDetail({ id }: { id: string }) {
             {other.bio && <p>{other.bio}</p>}
             <small>You’re starting a new conversation</small>
           </div>
-        )}
+        ) : null}
         {loading && <Spinner />}
         {error && <ErrorState message={error} retry={reload} />}
         {messages.map((message, index) => {
           const mine = message.senderId === viewer?.id;
+          const sender =
+            message.sender || participants.find((person) => person.id === message.senderId);
+          const startsSenderRun = index === 0 || messages[index - 1]?.senderId !== message.senderId;
           const showTime =
             index === messages.length - 1 || messages[index + 1]?.senderId !== message.senderId;
+          const bubble = (
+            <div
+              className={`message-bubble ${message.media.length ? 'with-media' : ''} ${
+                message.id.startsWith('pending-') ? 'pending' : ''
+              }`}
+            >
+              {message.media.map((media) => (
+                <MessageMediaView key={media.id} media={media} />
+              ))}
+              {message.text && <span className="message-text">{message.text}</span>}
+            </div>
+          );
           return (
-            <div className={`message-bubble-wrap ${mine ? 'mine' : 'theirs'}`} key={message.id}>
-              <div
-                className={`message-bubble ${message.media.length ? 'with-media' : ''} ${
-                  message.id.startsWith('pending-') ? 'pending' : ''
-                }`}
-              >
-                {message.media.map((media) => (
-                  <MessageMediaView key={media.id} media={media} />
-                ))}
-                {message.text && <span className="message-text">{message.text}</span>}
-              </div>
+            <div
+              className={`message-bubble-wrap ${mine ? 'mine' : 'theirs'} ${
+                isGroup && !mine ? 'group-incoming' : ''
+              }`}
+              key={message.id}
+            >
+              {isGroup && !mine && startsSenderRun && (
+                <span className="message-sender-name">
+                  <strong>{sender?.name || 'Unknown account'}</strong>
+                  {sender?.verified && <VerifiedBadge />}
+                </span>
+              )}
+              {isGroup && !mine ? (
+                <div className="group-message-row">
+                  {showTime ? (
+                    <Avatar user={sender} size={28} />
+                  ) : (
+                    <span className="message-avatar-spacer" aria-hidden="true" />
+                  )}
+                  {bubble}
+                </div>
+              ) : (
+                bubble
+              )}
               {showTime && (
                 <time>
                   {new Date(message.createdAt).toLocaleTimeString([], {
@@ -640,7 +764,7 @@ function ConversationDetail({ id }: { id: string }) {
           <div
             className="message-typing"
             role="status"
-            aria-label={`${other?.name || 'Someone'} is typing`}
+            aria-label={`${isGroup ? 'Someone' : other?.name || 'Someone'} is typing`}
           >
             <i />
             <i />
@@ -746,9 +870,55 @@ function ConversationDetail({ id }: { id: string }) {
           disabled={(!text.trim() && !attachment) || sending}
           aria-label={sending ? 'Sending' : 'Send'}
         >
-          {sending ? <Spinner /> : <Icon name="feather" size={21} />}
+          {sending ? <Spinner /> : <Icon name="send" size={21} />}
         </button>
       </form>
+      <Modal
+        open={isGroup && participantsOpen}
+        onClose={closeConversationInfo}
+        title="Conversation information"
+        className="conversation-info-modal"
+      >
+        <div className="conversation-info-titlebar">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={closeConversationInfo}
+            aria-label="Close"
+          >
+            <Icon name="close" />
+          </button>
+          <h2>Conversation info</h2>
+        </div>
+        <div className="conversation-info-summary">
+          <ConversationAvatar users={others} size={64} imageUrl={conversation?.avatarUrl} />
+          <strong>{conversationTitle}</strong>
+          <span>{participants.length} people</span>
+        </div>
+        <h3 className="conversation-info-section-title">People</h3>
+        <div className="conversation-participant-list">
+          {participants.map((person) => (
+            <Link
+              href={person.handle ? `/${person.handle}` : '/messages'}
+              className="conversation-participant"
+              key={person.id || person.handle}
+              onClick={closeConversationInfo}
+            >
+              <Avatar user={person} size={44} />
+              <span className="conversation-participant-copy">
+                <span>
+                  <strong>{person.name}</strong>
+                  {person.verified && <VerifiedBadge />}
+                </span>
+                <small>
+                  @{person.handle}
+                  {person.id === viewer?.id ? ' (You)' : ''}
+                </small>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -782,8 +952,10 @@ function MessageMediaView({ media }: { media: MessageMedia }) {
 
 function NewMessageModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<User[]>([]);
+  const [starting, setStarting] = useState(false);
   const { data, loading } = useApi<unknown>(
     query.trim().length >= 2
       ? `/api/v1/search?q=${encodeURIComponent(query.trim())}&type=people`
@@ -798,14 +970,25 @@ function NewMessageModal({ open, onClose }: { open: boolean; onClose: () => void
     [data],
   );
   const start = async () => {
-    if (!selected.length) return;
-    const created = await apiFetch<unknown>('/api/v1/conversations', {
-      method: 'POST',
-      body: JSON.stringify({ participantIds: selected.map((user) => user.id) }),
-    });
-    const conversation = normalizeConversation(created);
-    onClose();
-    router.push(`/messages/${conversation.id}`);
+    if (!selected.length || starting) return;
+    setStarting(true);
+    try {
+      const created = await apiFetch<unknown>('/api/v1/conversations', {
+        method: 'POST',
+        body: JSON.stringify({ participantIds: selected.map((user) => user.id) }),
+      });
+      const conversation = normalizeConversation(created);
+      onClose();
+      router.push(`/messages/${conversation.id}`);
+    } catch (reason) {
+      showToast(
+        reason instanceof Error
+          ? reason.message
+          : 'Something went wrong, but don’t fret — let’s give it another shot.',
+      );
+    } finally {
+      setStarting(false);
+    }
   };
   return (
     <Modal open={open} onClose={onClose} title="New message" className="new-message-modal">
@@ -816,10 +999,10 @@ function NewMessageModal({ open, onClose }: { open: boolean; onClose: () => void
         <h2>New message</h2>
         <button
           className="button button-primary"
-          disabled={!selected.length}
+          disabled={!selected.length || starting}
           onClick={() => void start()}
         >
-          Next
+          {starting ? <Spinner label="Starting conversation" /> : 'Next'}
         </button>
       </div>
       <div className="new-message-search">
@@ -862,7 +1045,7 @@ function NewMessageModal({ open, onClose }: { open: boolean; onClose: () => void
             }
           >
             <Avatar user={user} size={40} />
-            <span>
+            <span className="message-person-copy">
               <strong>{user.name}</strong>
               <small>@{user.handle}</small>
             </span>

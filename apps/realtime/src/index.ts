@@ -1,6 +1,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage } from 'node:http';
 import { createAdapter } from '@socket.io/redis-adapter';
+import {
+  assessRequestOrigin,
+  createTrustedOrigins,
+  type RequestOriginAssessment,
+} from '@twitter2020/contracts/origins';
 import {
   closeDb,
   conversationMembers,
@@ -12,6 +17,7 @@ import {
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import Redis from 'ioredis';
 import { Server } from 'socket.io';
+import { isMaintenanceMode } from './maintenance.js';
 
 type RealtimeToken = {
   userId: string;
@@ -21,6 +27,7 @@ type RealtimeToken = {
 const port = Number(process.env.REALTIME_PORT ?? 3001);
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
 const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+const trustedOrigins = createTrustedOrigins(appUrl, process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? '');
 const secret = process.env.REALTIME_SHARED_SECRET;
 
 if (!secret || secret.length < 32) {
@@ -65,8 +72,66 @@ const httpServer = createServer((request, response) => {
   response.writeHead(404).end();
 });
 
+function assessRealtimeOrigin(request: IncomingMessage): RequestOriginAssessment {
+  return assessRequestOrigin(
+    {
+      origin: headerValue(request.headers.origin),
+      host: headerValue(request.headers.host),
+      forwardedHost: headerValue(request.headers['x-forwarded-host']),
+      forwardedProto: headerValue(request.headers['x-forwarded-proto']),
+    },
+    trustedOrigins,
+  );
+}
+
+function logRejectedRealtimeOrigin(
+  request: IncomingMessage,
+  assessment: RequestOriginAssessment,
+): void {
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      service: 'realtime',
+      event: 'request.origin_rejected',
+      reason: assessment.reason,
+      method: request.method,
+      pathname: request.url?.split('?', 1)[0] ?? '/socket.io/',
+      origin: diagnosticHeader(request.headers.origin),
+      effectiveOrigin: assessment.effectiveOrigin,
+      host: diagnosticHeader(request.headers.host),
+      forwardedHost: diagnosticHeader(request.headers['x-forwarded-host']),
+      forwardedProto: diagnosticHeader(request.headers['x-forwarded-proto']),
+      trustedOrigins,
+    }),
+  );
+}
+
+function headerValue(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) return value.join(',');
+  return value ?? null;
+}
+
+function diagnosticHeader(value: string | string[] | undefined): string | null {
+  const normalized = headerValue(value);
+  return normalized ? normalized.slice(0, 512) : null;
+}
+
 const io = new Server(httpServer, {
-  cors: { origin: appUrl, credentials: true },
+  cors: { origin: trustedOrigins, credentials: true },
+  allowRequest: (request, callback) => {
+    if (isMaintenanceMode()) {
+      callback(null, false);
+      return;
+    }
+    const assessment = assessRealtimeOrigin(request);
+    const missingSameOriginHeader =
+      assessment.reason === 'missing' &&
+      headerValue(request.headers['sec-fetch-site']) === 'same-origin' &&
+      assessment.effectiveOrigin !== null;
+    const allowed = assessment.trusted || missingSameOriginHeader;
+    if (!allowed) logRejectedRealtimeOrigin(request, assessment);
+    callback(null, allowed);
+  },
   transports: ['websocket', 'polling'],
   pingInterval: 25_000,
   pingTimeout: 20_000,
@@ -77,6 +142,7 @@ const subscriber = publisher.duplicate();
 io.adapter(createAdapter(publisher, subscriber));
 
 io.use((socket, next) => {
+  if (isMaintenanceMode()) return next(new Error('service unavailable'));
   const decoded = decodeToken(socket.handshake.auth.token);
   if (!decoded) return next(new Error('unauthorized'));
   socket.data.userId = decoded.userId;
@@ -247,7 +313,25 @@ domainSubscriber.on('pmessage', (_pattern, channel, rawPayload) => {
   }
 });
 
+let maintenanceActive = isMaintenanceMode();
+const maintenanceTimer = setInterval(() => {
+  const enabled = isMaintenanceMode();
+  if (enabled === maintenanceActive) return;
+  maintenanceActive = enabled;
+  console.log(
+    JSON.stringify({
+      level: 'info',
+      service: 'realtime',
+      event: 'maintenance.changed',
+      enabled,
+    }),
+  );
+  if (enabled) io.disconnectSockets(true);
+}, 1_000);
+maintenanceTimer.unref();
+
 const shutdown = async () => {
+  clearInterval(maintenanceTimer);
   io.close();
   await Promise.all([publisher.quit(), subscriber.quit(), domainSubscriber.quit(), closeDb()]);
   httpServer.close(() => process.exit(0));

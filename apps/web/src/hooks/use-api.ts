@@ -28,18 +28,44 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   if (!response.ok) {
     const problem =
       payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
-    throw new ApiError(
-      String(
-        problem.detail || problem.message || problem.title || `Request failed (${response.status})`,
-      ),
-      response.status,
-      typeof problem.code === 'string' ? problem.code : undefined,
-    );
+    const code = typeof problem.code === 'string' ? problem.code : undefined;
+    if (
+      response.status === 503 &&
+      code === 'maintenance_mode' &&
+      typeof window !== 'undefined' &&
+      window.location.pathname !== '/maintenance'
+    ) {
+      window.location.assign('/maintenance');
+    }
+    throw new ApiError(userFacingError(problem, response.status, code), response.status, code);
   }
   if (payload && typeof payload === 'object' && 'data' in payload) {
     return (payload as { data: T }).data;
   }
   return payload as T;
+}
+
+export function userFacingError(
+  problem: Record<string, unknown>,
+  status: number,
+  code?: string,
+): string {
+  const normalizedCode = code?.toLowerCase() || '';
+  const technicalMessage = [problem.detail, problem.message, problem.title]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase();
+  const originOrCsrfFailure =
+    normalizedCode.includes('origin') ||
+    normalizedCode.includes('csrf') ||
+    technicalMessage.includes('invalid origin') ||
+    technicalMessage.includes('origin not trusted') ||
+    technicalMessage.includes('origin is not trusted') ||
+    technicalMessage.includes('csrf');
+  if (status >= 500 || originOrCsrfFailure) {
+    return 'Something went wrong, but don’t fret — let’s give it another shot.';
+  }
+  return String(problem.detail || problem.message || problem.title || `Request failed (${status})`);
 }
 
 type AsyncState<T> = {

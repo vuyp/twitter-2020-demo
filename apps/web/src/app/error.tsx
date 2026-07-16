@@ -8,11 +8,10 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <main id="main-content" className="access-gate">
-      <div className="access-gate-card">
-        <Icon name="bird" size={42} />
-        <h1>Something went wrong</h1>
-        <p>Don’t fret — let’s give it another shot.</p>
+    <main id="main-content" className="standalone-state">
+      <div className="standalone-state-content">
+        <Icon name="bird" size={39} />
+        <p>Something went wrong, but don’t fret — let’s give it another shot.</p>
         <button className="button button-primary" onClick={reset}>
           Try again
         </button>

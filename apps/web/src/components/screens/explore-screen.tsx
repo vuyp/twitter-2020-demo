@@ -23,8 +23,12 @@ type Trend = {
 
 export function ExploreScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState('for-you');
+  const requestedTab = searchParams.get('f') || 'for-you';
+  const tab = ['for-you', 'trending', 'news', 'sports', 'entertainment'].includes(requestedTab)
+    ? requestedTab
+    : 'for-you';
   const { data, loading, error, reload } = useApi<unknown>('/api/v1/trends');
   const source =
     data && typeof data === 'object' && !Array.isArray(data)
@@ -44,7 +48,7 @@ export function ExploreScreen() {
   };
 
   return (
-    <AppShell hideRightSidebar publicAccess>
+    <AppShell publicAccess>
       <div className="explore-header">
         <form className="explore-search" role="search" onSubmit={submit}>
           <Icon name="search" size={20} />
@@ -71,7 +75,16 @@ export function ExploreScreen() {
         {tabs.map((label) => {
           const key = label.toLowerCase().replace(' ', '-');
           return (
-            <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>
+            <button
+              key={key}
+              className={tab === key ? 'active' : ''}
+              aria-current={tab === key ? 'page' : undefined}
+              onClick={() =>
+                router.replace(key === 'for-you' ? '/explore' : `/explore?f=${key}`, {
+                  scroll: false,
+                })
+              }
+            >
               {label}
             </button>
           );
@@ -87,9 +100,6 @@ export function ExploreScreen() {
               ? 'Trends for you'
               : tabs.find((label) => label.toLowerCase() === tab) || 'Trending'}
           </h1>
-          <Link href="/settings/trends">
-            <Icon name="settings" size={21} />
-          </Link>
         </div>
         {loading && (
           <div className="explore-loading">

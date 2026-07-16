@@ -121,7 +121,19 @@ export function AppShell({
     if (!loading && viewer && !viewer.handle) router.replace('/i/flow/onboarding');
   }, [loading, router, viewer]);
 
-  if (loading) return <ShellSkeleton />;
+  const skeletonVariant: ShellSkeletonVariant =
+    pathname === '/explore'
+      ? 'explore'
+      : pathname.startsWith('/messages/')
+        ? 'message-detail'
+        : pathname === '/messages'
+          ? 'messages'
+          : 'timeline';
+
+  if (loading)
+    return (
+      <ShellSkeleton hideRightSidebar={hideRightSidebar} wide={wide} variant={skeletonVariant} />
+    );
   if (!viewer)
     return publicAccess ? (
       <GuestShell hideRightSidebar={hideRightSidebar} wide={wide}>
@@ -130,7 +142,10 @@ export function AppShell({
     ) : (
       <AccessGate />
     );
-  if (!viewer.handle) return <ShellSkeleton />;
+  if (!viewer.handle)
+    return (
+      <ShellSkeleton hideRightSidebar={hideRightSidebar} wide={wide} variant={skeletonVariant} />
+    );
 
   const isActive = (item: NavItem) => (item.match ? item.match(pathname) : pathname === item.href);
 
@@ -151,7 +166,7 @@ export function AppShell({
                 className={`nav-link ${isActive(item) ? 'nav-link-active' : ''}`}
                 aria-current={isActive(item) ? 'page' : undefined}
               >
-                <Icon name={item.icon} size={26} />
+                <Icon name={item.icon} size={26} active={isActive(item)} />
                 <span>{item.label}</span>
               </Link>
             ))}
@@ -161,7 +176,7 @@ export function AppShell({
                 onClick={() => setMoreOpen((value) => !value)}
                 aria-expanded={moreOpen}
               >
-                <Icon name="more" size={26} />
+                <Icon name="more" size={26} active={moreOpen} />
                 <span>More</span>
               </button>
               {moreOpen && (
@@ -235,7 +250,7 @@ export function AppShell({
               aria-current={isActive(item) ? 'page' : undefined}
               className={isActive(item) ? 'active' : ''}
             >
-              <Icon name={item.icon} size={26} />
+              <Icon name={item.icon} size={26} active={isActive(item)} />
             </Link>
           ))}
       </nav>
@@ -292,7 +307,11 @@ function GuestShell({
               href="/explore"
               className={`nav-link ${pathname === '/explore' || pathname.startsWith('/search') ? 'nav-link-active' : ''}`}
             >
-              <Icon name="explore" size={26} />
+              <Icon
+                name="explore"
+                size={26}
+                active={pathname === '/explore' || pathname.startsWith('/search')}
+              />
               <span>Explore</span>
             </Link>
           </nav>
@@ -368,9 +387,22 @@ function AccountSessions({ viewer }: { viewer: User }) {
   );
 }
 
-function ShellSkeleton() {
+type ShellSkeletonVariant = 'timeline' | 'explore' | 'messages' | 'message-detail';
+
+function ShellSkeleton({
+  hideRightSidebar = false,
+  wide = false,
+  variant = 'timeline',
+}: {
+  hideRightSidebar?: boolean;
+  wide?: boolean;
+  variant?: ShellSkeletonVariant;
+}) {
   return (
-    <div className="app-frame shell-skeleton" aria-label="Loading Twitter">
+    <div
+      className={`app-frame shell-skeleton ${hideRightSidebar ? 'app-frame-two-column' : ''} ${wide ? 'app-frame-wide' : ''}`}
+      aria-label="Loading Twitter"
+    >
       <aside className="primary-rail">
         <div className="primary-rail-inner">
           <div className="brand-button">
@@ -381,25 +413,122 @@ function ShellSkeleton() {
           ))}
         </div>
       </aside>
-      <main className="main-column">
-        <div className="page-header">
-          <Skeleton width={130} height={22} />
+      <main className={`main-column shell-skeleton-main shell-skeleton-main-${variant}`}>
+        {variant === 'explore' ? (
+          <ExploreShellSkeleton />
+        ) : variant === 'messages' || variant === 'message-detail' ? (
+          <MessagesShellSkeleton detailSelected={variant === 'message-detail'} />
+        ) : (
+          <TimelineShellSkeleton />
+        )}
+      </main>
+      {!hideRightSidebar && (
+        <aside className="right-rail">
+          <Skeleton height={44} round />
+          <Skeleton height={320} />
+        </aside>
+      )}
+    </div>
+  );
+}
+
+function TimelineShellSkeleton() {
+  return (
+    <>
+      <div className="page-header">
+        <Skeleton width={130} height={22} />
+      </div>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div className="tweet-skeleton" key={index}>
+          <Skeleton width={48} height={48} round />
+          <div>
+            <Skeleton width="35%" />
+            <Skeleton width="92%" />
+            <Skeleton width="75%" />
+          </div>
         </div>
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div className="tweet-skeleton" key={index}>
+      ))}
+    </>
+  );
+}
+
+function ExploreShellSkeleton() {
+  return (
+    <>
+      <div className="explore-shell-skeleton-header">
+        <Skeleton width="100%" height={43} round />
+        <Skeleton width={38} height={38} round />
+      </div>
+      <div className="explore-shell-skeleton-tabs">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <Skeleton key={index} width={index === 4 ? 76 : 54} height={14} />
+        ))}
+      </div>
+      <div className="explore-shell-skeleton-heading">
+        <Skeleton width={145} height={20} />
+      </div>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div className="explore-shell-skeleton-trend" key={index}>
+          <Skeleton width={index % 2 ? '27%' : '34%'} height={11} />
+          <Skeleton width={index % 2 ? '51%' : '43%'} height={15} />
+          <Skeleton width="23%" height={11} />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function MessagesShellSkeleton({ detailSelected }: { detailSelected: boolean }) {
+  return (
+    <div
+      className={`messages-shell-skeleton-layout ${detailSelected ? 'messages-shell-skeleton-selected' : ''}`}
+    >
+      <section className="messages-shell-skeleton-list" aria-hidden="true">
+        <div className="messages-shell-skeleton-header">
+          <Skeleton width={96} height={20} />
+          <span>
+            <Skeleton width={34} height={34} round />
+            <Skeleton width={34} height={34} round />
+          </span>
+        </div>
+        <div className="messages-shell-skeleton-search">
+          <Skeleton width="100%" height={30} round />
+        </div>
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div className="messages-shell-skeleton-row" key={index}>
             <Skeleton width={48} height={48} round />
-            <div>
-              <Skeleton width="35%" />
-              <Skeleton width="92%" />
-              <Skeleton width="75%" />
-            </div>
+            <span>
+              <Skeleton width={index % 2 ? '54%' : '68%'} height={14} />
+              <Skeleton width={index % 2 ? '78%' : '61%'} height={13} />
+            </span>
           </div>
         ))}
-      </main>
-      <aside className="right-rail">
-        <Skeleton height={44} round />
-        <Skeleton height={320} />
-      </aside>
+      </section>
+      <section className="messages-shell-skeleton-detail" aria-hidden="true">
+        {detailSelected ? (
+          <>
+            <div className="messages-shell-skeleton-detail-header">
+              <Skeleton width={32} height={32} round />
+              <span>
+                <Skeleton width={124} height={14} />
+                <Skeleton width={82} height={11} />
+              </span>
+              <Skeleton width={34} height={34} round />
+            </div>
+            <div className="messages-shell-skeleton-thread">
+              <Skeleton width="34%" height={42} round />
+              <Skeleton width="49%" height={58} round />
+              <Skeleton width="38%" height={42} round />
+            </div>
+          </>
+        ) : (
+          <div className="messages-shell-skeleton-empty">
+            <Skeleton width={220} height={23} />
+            <Skeleton width={310} height={14} />
+            <Skeleton width={118} height={36} round />
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -534,16 +663,18 @@ export function EmptyState({
 }
 
 export function ErrorState({ message, retry }: { message?: string; retry?: () => void }) {
-  const generic = !message || message.toLowerCase() === 'something went wrong';
+  const normalized = message?.trim().toLowerCase() || '';
+  const generic =
+    !normalized ||
+    normalized.includes('something went wrong') ||
+    normalized.includes('request failed') ||
+    normalized.includes('internal error');
   return (
     <div className="error-state" role="alert">
-      <span className="state-icon state-icon-error" aria-hidden="true">
-        <Icon name="warning" size={30} />
-      </span>
-      <h2>Something went wrong</h2>
-      <p>{generic ? "We couldn't load this right now. Please try again." : message}</p>
+      <p>{generic ? 'Something went wrong.' : message}</p>
       {retry && (
         <button className="button button-primary" onClick={retry}>
+          <Icon name="refresh" size={17} />
           Try again
         </button>
       )}

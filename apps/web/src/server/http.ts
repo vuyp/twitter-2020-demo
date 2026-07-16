@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import type { ZodType } from 'zod';
 import { ZodError } from 'zod';
 import { ApiError, zodErrors } from './errors';
-import { getServerEnv, isTrustedOrigin } from './env';
+import { assessWebRequestOrigin, logRejectedRequestOrigin } from './request-origin';
 
 export type RouteContext<T extends Record<string, string> = Record<string, string>> = {
   params: Promise<T>;
@@ -93,12 +93,15 @@ function assertSameOriginMutation(value: unknown): void {
   )
     return;
   const fetchSite = value.headers.get('sec-fetch-site');
+  const assessment = assessWebRequestOrigin(value);
   if (fetchSite === 'cross-site') {
+    logRejectedRequestOrigin(value, 'rest', assessment, 'cross-site');
     throw new ApiError(403, 'csrf_rejected', 'Cross-site mutation requests are not allowed');
   }
   const origin = value.headers.get('origin');
   if (!origin) return;
-  if (!isTrustedOrigin(origin, getServerEnv())) {
+  if (!assessment.trusted) {
+    logRejectedRequestOrigin(value, 'rest', assessment);
     throw new ApiError(403, 'csrf_rejected', 'The request origin is not trusted');
   }
 }

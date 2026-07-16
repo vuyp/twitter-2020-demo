@@ -1,3 +1,7 @@
+import {
+  createTrustedOrigins,
+  isTrustedOrigin as matchesTrustedOrigin,
+} from '@twitter2020/contracts/origins';
 import { z } from 'zod';
 
 const serverEnvSchema = z.object({
@@ -50,27 +54,14 @@ export type ServerEnv = z.infer<typeof serverEnvSchema>;
 export function getTrustedOrigins(
   env: Pick<ServerEnv, 'APP_URL' | 'BETTER_AUTH_TRUSTED_ORIGINS'>,
 ): string[] {
-  return [...new Set([env.APP_URL, ...env.BETTER_AUTH_TRUSTED_ORIGINS].map(toHttpOrigin))];
+  return createTrustedOrigins(env.APP_URL, env.BETTER_AUTH_TRUSTED_ORIGINS);
 }
 
 export function isTrustedOrigin(
   value: string,
   env: Pick<ServerEnv, 'APP_URL' | 'BETTER_AUTH_TRUSTED_ORIGINS'>,
 ): boolean {
-  try {
-    const parsed = new URL(value);
-    return parsed.origin === value && getTrustedOrigins(env).includes(value);
-  } catch {
-    return false;
-  }
-}
-
-function toHttpOrigin(value: string): string {
-  const parsed = new URL(value);
-  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
-    throw new Error('Trusted origins must be HTTP(S) URLs without credentials');
-  }
-  return parsed.origin;
+  return matchesTrustedOrigin(value, getTrustedOrigins(env));
 }
 
 export function parseServerEnv(source: Record<string, string | undefined>): ServerEnv {

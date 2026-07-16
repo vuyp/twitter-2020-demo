@@ -3,9 +3,12 @@ name: twitter-2020
 x-app-environment: &app-environment
   NODE_ENV: production
   APP_URL: http://localhost
+  MAINTENANCE_MODE: ${MAINTENANCE_MODE:-false}
+  MAINTENANCE_STATE_FILE: /app/.runtime/maintenance
   DATABASE_URL: postgresql://twitter:twitter@postgres:5432/twitter
   REDIS_URL: redis://redis:6379
   BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+  BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-}
   AUTH_REQUIRE_EMAIL_VERIFICATION: ${AUTH_REQUIRE_EMAIL_VERIFICATION:-true}
   REALTIME_SHARED_SECRET: ${REALTIME_SHARED_SECRET:?Set REALTIME_SHARED_SECRET in .env}
   INTERNAL_API_URL: http://web:3000
@@ -110,6 +113,8 @@ services:
       context: .
       target: web
     environment: *app-environment
+    volumes:
+      - ./.runtime:/app/.runtime:ro
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -145,6 +150,8 @@ services:
     environment:
       <<: *app-environment
       REALTIME_PORT: 3001
+    volumes:
+      - ./.runtime:/app/.runtime:ro
     depends_on:
       migrate:
         condition: service_completed_successfully

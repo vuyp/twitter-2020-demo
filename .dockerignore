@@ -4,6 +4,7 @@ node_modules
 .next
 **/.next
 .turbo
+.runtime
 coverage
 playwright-report
 test-results

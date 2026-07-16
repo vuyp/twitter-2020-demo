@@ -28,7 +28,7 @@ export function RightSidebar() {
     loading: trendsLoading,
     error: trendsError,
     reload: reloadTrends,
-  } = useApi<unknown[]>('/api/v1/trends', []);
+  } = useApi<unknown[]>(pathname === '/explore' ? null : '/api/v1/trends', []);
   const {
     data: suggestionPayload,
     loading: suggestionsLoading,
@@ -55,7 +55,7 @@ export function RightSidebar() {
 
   return (
     <aside className="right-rail" aria-label="Sidebar">
-      {!pathname.startsWith('/search') && (
+      {!pathname.startsWith('/search') && pathname !== '/explore' && (
         <form className="global-search" role="search" onSubmit={submit}>
           <Icon name="search" size={20} />
           <label className="sr-only" htmlFor="global-search">
@@ -75,47 +75,49 @@ export function RightSidebar() {
           )}
         </form>
       )}
-      <section className="sidebar-card" aria-labelledby="trends-title">
-        <div className="sidebar-card-title">
-          <h2 id="trends-title">What’s happening</h2>
-          <Link href="/settings/trends" aria-label="Trend settings">
-            <Icon name="settings" size={21} />
+      {pathname !== '/explore' && (
+        <section className="sidebar-card" aria-labelledby="trends-title">
+          <div className="sidebar-card-title">
+            <h2 id="trends-title">What’s happening</h2>
+            <Link href="/settings/trends" aria-label="Trend settings">
+              <Icon name="settings" size={21} />
+            </Link>
+          </div>
+          {trendsLoading &&
+            Array.from({ length: 3 }).map((_, i) => (
+              <div className="trend-row trend-row-loading" key={i}>
+                <span />
+                <strong />
+                <span />
+              </div>
+            ))}
+          {!trendsLoading && trendsError && (
+            <SidebarError message="Trends aren’t available right now." retry={reloadTrends} />
+          )}
+          {!trendsLoading && !trendsError && trends.length === 0 && (
+            <div className="sidebar-card-empty">Trends appear here as people start Tweeting.</div>
+          )}
+          {!trendsError &&
+            trends.slice(0, 6).map((trend, index) => {
+              const name = trend.name || trend.topic || '';
+              const count = trend.tweetCount || trend.count;
+              return (
+                <Link
+                  key={`${name}-${index}`}
+                  href={`/search?q=${encodeURIComponent(name)}`}
+                  className="trend-row"
+                >
+                  <span>{trend.category || 'Trending'}</span>
+                  <strong>{name}</strong>
+                  {count ? <span>{count.toLocaleString()} Tweets</span> : <span>Trending now</span>}
+                </Link>
+              );
+            })}
+          <Link className="sidebar-show-more" href="/explore">
+            Show more
           </Link>
-        </div>
-        {trendsLoading &&
-          Array.from({ length: 3 }).map((_, i) => (
-            <div className="trend-row trend-row-loading" key={i}>
-              <span />
-              <strong />
-              <span />
-            </div>
-          ))}
-        {!trendsLoading && trendsError && (
-          <SidebarError message="Trends aren’t available right now." retry={reloadTrends} />
-        )}
-        {!trendsLoading && !trendsError && trends.length === 0 && (
-          <div className="sidebar-card-empty">Trends appear here as people start Tweeting.</div>
-        )}
-        {!trendsError &&
-          trends.slice(0, 6).map((trend, index) => {
-            const name = trend.name || trend.topic || '';
-            const count = trend.tweetCount || trend.count;
-            return (
-              <Link
-                key={`${name}-${index}`}
-                href={`/search?q=${encodeURIComponent(name)}`}
-                className="trend-row"
-              >
-                <span>{trend.category || 'Trending'}</span>
-                <strong>{name}</strong>
-                {count ? <span>{count.toLocaleString()} Tweets</span> : <span>Trending now</span>}
-              </Link>
-            );
-          })}
-        <Link className="sidebar-show-more" href="/explore">
-          Show more
-        </Link>
-      </section>
+        </section>
+      )}
       <section className="sidebar-card" aria-labelledby="follow-title">
         <div className="sidebar-card-title">
           <h2 id="follow-title">Who to follow</h2>

@@ -4,7 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./origins": {
+      "types": "./origins.d.mts",
+      "import": "./origins.mjs",
+      "default": "./origins.mjs"
+    }
   },
   "scripts": {
     "build": "tsc --noEmit",
